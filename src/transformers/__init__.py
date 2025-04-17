@@ -619,6 +619,10 @@ _import_structure = {
         "MgpstrTokenizer",
     ],
     "models.mimi": ["MimiConfig"],
+    "models.minicpm_o_2_6": [
+        "MiniCPM_o_2_6Config",
+        "MiniCPM_o_2_6Processor",
+    ],
     "models.mistral": ["MistralConfig"],
     "models.mistral3": ["Mistral3Config"],
     "models.mixtral": ["MixtralConfig"],
@@ -1176,6 +1180,7 @@ else:
     _import_structure["models.mbart"].append("MBartTokenizerFast")
     _import_structure["models.mbart50"].append("MBart50TokenizerFast")
     _import_structure["models.mobilebert"].append("MobileBertTokenizerFast")
+    _import_structure["models.minicpm_o_2_6"].append("MiniCPM_o_2_6TokenizerFast")
     _import_structure["models.mpnet"].append("MPNetTokenizerFast")
     _import_structure["models.mt5"].append("MT5TokenizerFast")
     _import_structure["models.mvp"].append("MvpTokenizerFast")
@@ -1303,6 +1308,7 @@ else:
     )
     _import_structure["models.mask2former"].append("Mask2FormerImageProcessor")
     _import_structure["models.maskformer"].extend(["MaskFormerFeatureExtractor", "MaskFormerImageProcessor"])
+    _import_structure["models.minicpm_o_2_6"].extend(["MiniCPM_o_2_6Processor"])
     _import_structure["models.mllama"].extend(["MllamaImageProcessor"])
     _import_structure["models.mobilenet_v1"].extend(["MobileNetV1FeatureExtractor", "MobileNetV1ImageProcessor"])
     _import_structure["models.mobilenet_v2"].extend(["MobileNetV2FeatureExtractor", "MobileNetV2ImageProcessor"])
@@ -2984,6 +2990,12 @@ else:
         [
             "MimiModel",
             "MimiPreTrainedModel",
+        ]
+    )
+    _import_structure["models.minicpm_o_2_6"].extend(
+        [
+            "MiniCPM_o_2_6Model",
+            "MiniCPM_o_2_6PreTrainedModel",
         ]
     )
     _import_structure["models.mistral"].extend(
@@ -5887,6 +5899,10 @@ if TYPE_CHECKING:
     from .models.mimi import (
         MimiConfig,
     )
+    from .models.minicpm_o_2_6 import (
+        MiniCPM_o_2_6Config, 
+        MiniCPM_o_2_6Processor,
+    )
     from .models.mistral import MistralConfig
     from .models.mistral3 import Mistral3Config
     from .models.mixtral import MixtralConfig
@@ -6485,6 +6501,7 @@ if TYPE_CHECKING:
         from .models.markuplm import MarkupLMTokenizerFast
         from .models.mbart import MBartTokenizerFast
         from .models.mbart50 import MBart50TokenizerFast
+        from .models.minicpm_o_2_6 import MiniCPM_o_2_6TokenizerFast
         from .models.mobilebert import MobileBertTokenizerFast
         from .models.mpnet import MPNetTokenizerFast
         from .models.mt5 import MT5TokenizerFast
@@ -6606,6 +6623,7 @@ if TYPE_CHECKING:
             MaskFormerFeatureExtractor,
             MaskFormerImageProcessor,
         )
+        from .models.minicpm_o_2_6 import MiniCPM_o_2_6Processor
         from .models.mllama import MllamaImageProcessor
         from .models.mobilenet_v1 import (
             MobileNetV1FeatureExtractor,
@@ -7970,6 +7988,10 @@ if TYPE_CHECKING:
         from .models.mimi import (
             MimiModel,
             MimiPreTrainedModel,
+        )
+        from .models.minicpm_o_2_6 import (
+            MiniCPM_o_2_6Model,
+            MiniCPM_o_2_6PreTrainedModel
         )
         from .models.mistral import (
             MistralForCausalLM,
