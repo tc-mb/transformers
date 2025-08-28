@@ -42,8 +42,7 @@ class MiniCPMVSliceConfig(PretrainedConfig):
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> "PretrainedConfig":
-        config_dict, kwargs = cls.get_config_dict(
-            pretrained_model_name_or_path, **kwargs)
+        config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         if config_dict.get("model_type") == "minicpmv":
             config_dict = config_dict["slice_config"]
@@ -206,8 +205,7 @@ class MiniCPM_o_2_6Config(PretrainedConfig):
 
         # same as HuggingFaceM4/siglip-so400m-14-980-flash-attn2-navit add tgt_sizes
         if vision_config is None:
-            self.vision_config = SiglipVisionConfig(
-                **self.default_vision_config)
+            self.vision_config = SiglipVisionConfig(**self.default_vision_config)
             logger.info("vision_config is None, using default vision config")
         elif isinstance(vision_config, dict):
             self.vision_config = SiglipVisionConfig(**vision_config)
@@ -272,6 +270,7 @@ class MiniCPM_o_2_6Config(PretrainedConfig):
             tie_word_embeddings=tie_word_embeddings,
             **kwargs,
         )
+
 
 class MiniCPMConditionalTTSTextConfig(PretrainedConfig):
     r"""
@@ -470,5 +469,6 @@ class MiniCPMConditionalTTSTextConfig(PretrainedConfig):
             tie_word_embeddings=tie_word_embeddings,
             **kwargs,
         )
+
 
 __all__ = ["MiniCPM_o_2_6Config"]

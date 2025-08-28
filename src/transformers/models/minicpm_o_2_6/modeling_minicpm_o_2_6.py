@@ -39,8 +39,23 @@ from torch.nn.utils.parametrizations import weight_norm
 from huggingface_hub import hf_hub_download
 
 from transformers import AutoProcessor, BertTokenizerFast, PreTrainedModel, TextIteratorStreamer
-from transformers.modeling_outputs import BaseModelOutput, BaseModelOutputWithPast, BaseModelOutputWithPooling, CausalLMOutputWithPast
-from transformers.utils import ModelOutput, add_start_docstrings, add_start_docstrings_to_model_forward, is_flash_attn_2_available, logging, replace_return_docstrings, can_return_tuple, auto_docstring, TransformersKwargs
+from transformers.modeling_outputs import (
+    BaseModelOutput,
+    BaseModelOutputWithPast,
+    BaseModelOutputWithPooling,
+    CausalLMOutputWithPast,
+)
+from transformers.utils import (
+    ModelOutput,
+    add_start_docstrings,
+    add_start_docstrings_to_model_forward,
+    is_flash_attn_2_available,
+    logging,
+    replace_return_docstrings,
+    can_return_tuple,
+    auto_docstring,
+    TransformersKwargs,
+)
 from transformers.cache_utils import Cache, DynamicCache, EncoderDecoderCache, StaticCache
 from transformers.generation import GenerationMixin
 from transformers.generation.utils import GenerateOutput
@@ -67,15 +82,20 @@ try:
 except:
     _tts_deps = False
 
-from .configuration_minicpm_o_2_6 import MiniCPMConditionalTTSConfig, MiniCPM_o_2_6Config, MiniCPMConditionalTTSTextConfig
+from .configuration_minicpm_o_2_6 import (
+    MiniCPMConditionalTTSConfig,
+    MiniCPM_o_2_6Config,
+    MiniCPMConditionalTTSTextConfig,
+)
 from .processing_minicpm_o_2_6 import NumberToTextConverter, sentence_end, VoiceChecker
 
 logger = logging.get_logger(__name__)
 
+
 @dataclass
 class OmniOutput(ModelOutput):
     text: Optional[Union[str, List[str], Iterator]] = None
-    outputs: (GenerateOutput | torch.LongTensor) = None
+    outputs: GenerateOutput | torch.LongTensor = None
     spk_embeds: Optional[torch.FloatTensor] = None
     audio_wav: Optional[np.ndarray] = None
     sampling_rate: Optional[int] = None
@@ -509,7 +529,7 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
     _tied_weights_keys = ["lm_head.weight"]
     _tp_plan = {"lm_head": "colwise_rep"}
     _pp_plan = {"lm_head": (["hidden_states"], ["logits"])}
-    
+
     def __init__(self, config):
         super().__init__(config)
         self.language_model = MiniCPM_o_2_6TextModel(config)
@@ -732,9 +752,7 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
 
             max_patches = torch.max(tgt_sizes[:, 0] * tgt_sizes[:, 1])
 
-            all_pixel_values = torch.nn.utils.rnn.pad_sequence(
-                all_pixel_values, batch_first=True, padding_value=0.0
-            )
+            all_pixel_values = torch.nn.utils.rnn.pad_sequence(all_pixel_values, batch_first=True, padding_value=0.0)
             B, L, _ = all_pixel_values.shape
             all_pixel_values = all_pixel_values.permute(0, 2, 1).reshape(B, 3, -1, L)
 
@@ -792,20 +810,18 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
         dtype = self.language_model.embed_tokens.weight.dtype
         device = self.language_model.embed_tokens.weight.device
         if "vision_hidden_states" not in data:
-            vision_hidden_states = self.get_image_features(
-                data["pixel_values"], data["tgt_sizes"], dtype, device
-            )
+            vision_hidden_states = self.get_image_features(data["pixel_values"], data["tgt_sizes"], dtype, device)
         else:
             vision_hidden_states = data["vision_hidden_states"]
 
         vllm_embedding = self.language_model.embed_tokens(data["input_ids"]) * self.scale_emb
 
         new_vllm_embedding = vllm_embedding.clone()
-        
+
         vision_hidden_states = [
             i.type(vllm_embedding.dtype) if isinstance(i, torch.Tensor) else i for i in vision_hidden_states
         ]
-        
+
         bs = len(data["input_ids"])
         for i in range(bs):
             cur_vs_hs = vision_hidden_states[i]
@@ -828,7 +844,9 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
 
         return new_vllm_embedding, vision_hidden_states
 
-    def get_audio_embedding_streaming(self, audio_features: torch.FloatTensor = [], audio_feature_lens_raw: List[List[int]] = []):
+    def get_audio_embedding_streaming(
+        self, audio_features: torch.FloatTensor = [], audio_feature_lens_raw: List[List[int]] = []
+    ):
         r"""
         Extract audio embeddings in a streaming manner using cached key-value pairs.
 
@@ -885,7 +903,13 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
         else:
             return []
 
-    def get_audio_embedding(self, audio_features: torch.FloatTensor = [], audio_feature_lens_raw: List[List[int]] = [], chunk_length=-1, dummy=True):
+    def get_audio_embedding(
+        self,
+        audio_features: torch.FloatTensor = [],
+        audio_feature_lens_raw: List[List[int]] = [],
+        chunk_length=-1,
+        dummy=True,
+    ):
         r"""
         Extract full audio embeddings with optional chunk-based attention.
 
@@ -972,9 +996,13 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
             final embeddings with audio feature
         """
         if stream_input:
-            audio_embeddings = self.get_audio_embedding_streaming(data.get("audio_features", []), data.get("audio_feature_lens", []))
+            audio_embeddings = self.get_audio_embedding_streaming(
+                data.get("audio_features", []), data.get("audio_feature_lens", [])
+            )
         else:
-            audio_embeddings = self.get_audio_embedding(data.get("audio_features", []), data.get("audio_feature_lens", []), chunk_length)
+            audio_embeddings = self.get_audio_embedding(
+                data.get("audio_features", []), data.get("audio_feature_lens", []), chunk_length
+            )
 
         bs = len(input_embeddings)
         if len(data.get("audio_features", [])) > 0:
@@ -998,9 +1026,7 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
                     audio_embs = audio_embeddings[i]
                     bounds = audio_bounds[i]
                     for embs, bound in zip(audio_embs, bounds):
-                        audio_indices = torch.arange(bound[0], bound[1], dtype=torch.long).to(
-                            input_embeddings.device
-                        )
+                        audio_indices = torch.arange(bound[0], bound[1], dtype=torch.long).to(input_embeddings.device)
 
                         if embs.shape[0] != len(audio_indices):
                             raise ValueError(
@@ -1190,6 +1216,7 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
                 )
 
         if stream:
+
             def stream_gen():
                 for text in result:
                     for term in processor.tokenizer.terminators:
@@ -1203,11 +1230,17 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
 
         else:
             spk_embeds = wav_numpy = sr = None
-            
+
             if not batched and use_tts_template and generate_audio:
                 result = processor.decode_text(outputs.sequences, processor.tokenizer)
-                mel_spec = self._generate_mel_spec(model_inputs, outputs, result[0], tts_config={'top_p': 0.7, 'top_k': 20, 'repetition_penalty': 1.0}, force_no_stop=force_no_stop)
-                wav_numpy, sr = self.decode_mel_to_audio(mel_spec, kwargs.get('output_audio_path', None))
+                mel_spec = self._generate_mel_spec(
+                    model_inputs,
+                    outputs,
+                    result[0],
+                    tts_config={"top_p": 0.7, "top_k": 20, "repetition_penalty": 1.0},
+                    force_no_stop=force_no_stop,
+                )
+                wav_numpy, sr = self.decode_mel_to_audio(mel_spec, kwargs.get("output_audio_path", None))
 
             if return_spk_embed:
                 spk_embeds = self._get_last_spk_embeds(model_inputs, outputs)
@@ -1216,7 +1249,6 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
                 return OmniOutput(outputs=outputs, spk_embeds=spk_embeds, audio_wav=wav_numpy, sampling_rate=sr)
             else:
                 return outputs
-            
 
     @torch.inference_mode()
     def streaming_prefill(
@@ -1287,7 +1319,10 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
             self.session_id = session_id
 
             prompt = processor.tokenizer.apply_chat_template(
-                copy_msgs, tokenize=False, add_generation_prompt=False, chat_template=processor.default_tts_chat_template
+                copy_msgs,
+                tokenize=False,
+                add_generation_prompt=False,
+                chat_template=processor.default_tts_chat_template,
             )
             add_special_tokens = True  # add bos
         else:
@@ -1337,7 +1372,7 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
 
         self.llm_past_key_values = outputs["past_key_values"]
         return
-        
+
     # Copy and modified from transformers.models.llama.modeling_llama.LlamaForCausalLM.prepare_inputs_for_generation
     # if use the same method in `GenerationMixin`, it will cause an error in `_cache_dependant_input_preparation` when use stream, the error message is as follows:
     #   (cache_position[-1] >= input_ids.shape[1])  # Exception 3
@@ -1374,7 +1409,7 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
                 input_ids = input_ids[:, past_length:]
             # 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
 
-        #print("--------- my prepare_inputs_for_generation")
+        # print("--------- my prepare_inputs_for_generation")
         if attention_mask is not None and position_ids is None:
             # create position_ids on the fly for batch generation
             position_ids = attention_mask.long().cumsum(-1) - 1
@@ -1479,12 +1514,18 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
         attention_mask = torch.ones((1, cache_length + input_ids.shape[1]), dtype=torch.bool, device=self.device)
 
         generation_config["max_new_tokens"] = max_new_tokens
-        streamer = self.llm_generate_chunk(input_ids, attention_mask, tokenizer, tokenizer.terminator_ids, generation_config)
+        streamer = self.llm_generate_chunk(
+            input_ids, attention_mask, tokenizer, tokenizer.terminator_ids, generation_config
+        )
 
         if generate_audio:
             result = self._generate_mel_spec_audio_streaming(
-                spk_bounds, streamer, output_chunk_size=25, enable_regenerate=enable_regenerate, 
-                tts_config={"top_p": 0.7, "top_k": 20, "repetition_penalty": 1.0}, force_no_stop=force_no_stop
+                spk_bounds,
+                streamer,
+                output_chunk_size=25,
+                enable_regenerate=enable_regenerate,
+                tts_config={"top_p": 0.7, "top_k": 20, "repetition_penalty": 1.0},
+                force_no_stop=force_no_stop,
             )
             return result
         else:
@@ -1510,7 +1551,9 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
         while True:
             outputs = super().generate(
                 input_ids=input_ids,
-                past_key_values=self.llm_past_key_values.to_legacy_cache() if isinstance(self.llm_past_key_values, DynamicCache) else self.llm_past_key_values,
+                past_key_values=self.llm_past_key_values.to_legacy_cache()
+                if isinstance(self.llm_past_key_values, DynamicCache)
+                else self.llm_past_key_values,
                 attention_mask=attention_mask,
                 use_cache=True,
                 max_new_tokens=3,  # reduce first token delay
@@ -1596,7 +1639,16 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
         spk_embeds = last_hidden_states[spk_bound[0] : spk_bound[1]]
         return spk_embeds
 
-    def _generate_mel_spec(self, inputs, outputs, text, force_no_stop=False, output_chunk_size=25, tts_max_new_tokens=2048, tts_config: dict = {"top_p": 0.7, "top_k": 20, "repetition_penalty": 1.0}):
+    def _generate_mel_spec(
+        self,
+        inputs,
+        outputs,
+        text,
+        force_no_stop=False,
+        output_chunk_size=25,
+        tts_max_new_tokens=2048,
+        tts_config: dict = {"top_p": 0.7, "top_k": 20, "repetition_penalty": 1.0},
+    ):
         spk_embeds = self._get_last_spk_embeds(inputs, outputs)
 
         text = text.split("<|tts_bos|>")[-1]
@@ -1607,7 +1659,10 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
         streaming_tts_text_mask = self._build_streaming_mask(tts_token_lens).to(device=self.tts.device)
 
         logits_warpers, logits_processors = gen_logits(
-            num_code=626, top_P=tts_config['top_p'], top_K=tts_config['top_k'], repetition_penalty=tts_config['repetition_penalty']
+            num_code=626,
+            top_P=tts_config["top_p"],
+            top_K=tts_config["top_k"],
+            repetition_penalty=tts_config["repetition_penalty"],
         )
 
         condition_length = (
@@ -1784,7 +1839,10 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
 
         # init past_key_values
         logits_warpers, logits_processors = gen_logits(
-            num_code=626, top_P=tts_config['top_p'], top_K=tts_config['top_k'], repetition_penalty=tts_config['repetition_penalty']
+            num_code=626,
+            top_P=tts_config["top_p"],
+            top_K=tts_config["top_k"],
+            repetition_penalty=tts_config["repetition_penalty"],
         )
         condition_length = (
             1 + self.tts.use_speaker_embedding * self.tts.num_spk_embs + self.tts.streaming_text_reserved_len + 1
@@ -1889,7 +1947,6 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
                     break
 
             if tts_token_lens >= (chunk_idx + 1) * self.tts.streaming_text_chunk_size:
-
                 # do prefill and generate
                 if chunk_idx == 0:
                     begin = 0
@@ -1897,7 +1954,8 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
                 else:
                     begin = chunk_idx * self.tts.streaming_text_chunk_size + tts_start_token_len
                     end = min(
-                        (chunk_idx + 1) * self.tts.streaming_text_chunk_size + tts_start_token_len, condition_length - 1
+                        (chunk_idx + 1) * self.tts.streaming_text_chunk_size + tts_start_token_len,
+                        condition_length - 1,
                     )
 
                 tts_input_ids = self.tts_processor.text_tokenizer(
@@ -2114,7 +2172,9 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
 
         if prev_wav is not None:
             cur_text = gen_text_raw[prev_text_len:]
-            yield OmniOutput(text=cur_text, audio_wav=prev_wav, sampling_rate=sr)  # yield last chunk wav without smooth
+            yield OmniOutput(
+                text=cur_text, audio_wav=prev_wav, sampling_rate=sr
+            )  # yield last chunk wav without smooth
 
         if new_segment_gen and not stop:
             logger.debug(
@@ -2149,6 +2209,7 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
             logger.info(f"Audio saved to {output_path}")
         return wav_numpy, sr
 
+
 def get_cache_usable_length(past_key_value: Cache, new_seq_length: int, layer_idx: Optional[int] = 0) -> int:
     """Given the sequence length of the new inputs, returns the usable length of the cache."""
     # Cache without size limit -> all cache is usable
@@ -2159,6 +2220,7 @@ def get_cache_usable_length(past_key_value: Cache, new_seq_length: int, layer_id
     if max_length is not None and previous_seq_length + new_seq_length > max_length:
         return max_length - new_seq_length
     return p
+
 
 # Copied from transformers.models.whisper.modeling_whisper.WhisperAttention and support past_key_value
 class MiniCPMWhisperAttention(nn.Module):
@@ -2285,6 +2347,7 @@ class MiniCPMWhisperAttention(nn.Module):
 
         return attn_output, attn_weights, past_key_value
 
+
 # Copied from transformers.models.whisper.modeling_whisper.WhisperEncoderLayer and add use_cache for streaming inference
 class MiniCPMWhisperEncoderLayer(nn.Module):
     def __init__(self, config: WhisperConfig, layer_idx: int = None):
@@ -2371,7 +2434,6 @@ class MiniCPMWhisperEncoderLayer(nn.Module):
 
 # Copied from from transformers.models.whisper.modeling_whisper.WhisperEncoder and add use_cache for streaming inference
 class MiniCPMWhisperEncoder(WhisperEncoder):
-
     def __init__(self, config: WhisperConfig):
         super().__init__(config)
         self.layers = nn.ModuleList(
@@ -2515,7 +2577,9 @@ class MiniCPMWhisperEncoder(WhisperEncoder):
                 past_key_values = EncoderDecoderCache(past_key_values, DynamicCache())
             else:
                 pass
-            past_key_values_length = get_cache_usable_length(past_key_values.self_attention_cache, inputs_embeds.shape[1])
+            past_key_values_length = get_cache_usable_length(
+                past_key_values.self_attention_cache, inputs_embeds.shape[1]
+            )
             if inputs_embeds.shape[1] + past_key_values_length > embed_pos.shape[0]:
                 logger.warning("seems the audio is longer than 30s. repeating the last part of the audio")
                 embed_pos_front = embed_pos[past_key_values_length:, :]
@@ -2542,9 +2606,9 @@ class MiniCPMWhisperEncoder(WhisperEncoder):
 
         # check if head_mask has a correct number of layers specified if desired
         if head_mask is not None:
-            assert head_mask.size()[0] == (
-                len(self.layers)
-            ), f"The head_mask should be specified for {len(self.layers)} layers, but it is for {head_mask.size()[0]}."
+            assert head_mask.size()[0] == (len(self.layers)), (
+                f"The head_mask should be specified for {len(self.layers)} layers, but it is for {head_mask.size()[0]}."
+            )
 
         for idx, encoder_layer in enumerate(self.layers):
             if output_hidden_states:
@@ -3037,6 +3101,7 @@ def _prepare_4d_causal_attention_mask_with_cache_position(
 
     return causal_mask
 
+
 @use_kernel_forward_from_hub("RMSNorm")
 class MiniCPMConditionalTTSTextRMSNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-6):
@@ -3452,7 +3517,7 @@ class MiniCPMConditionalTTSTextModel(MiniCPMConditionalTTSTextPreTrainedModel):
             hidden_states=all_hidden_states,
             attentions=all_self_attns,
         )
-    
+
     def _update_causal_mask(
         self,
         attention_mask: torch.Tensor,
@@ -3757,7 +3822,9 @@ class ConditionalChatTTS(PreTrainedModel):
         outputs_prefill: BaseModelOutputWithPast = self.model(
             attention_mask=None,  # because for text, it is standard causal attention mask, do nothing
             position_ids=position_ids,  # position_ids denotes the position of new text tokens in the sequence
-            past_key_values=DynamicCache.from_legacy_cache(past_key_values_for_prefill),  # `past_key_values` will be updated by the model
+            past_key_values=DynamicCache.from_legacy_cache(
+                past_key_values_for_prefill
+            ),  # `past_key_values` will be updated by the model
             inputs_embeds=inputs_embeds,  # contains text and language model embedding
             use_cache=True,
             output_attentions=False,
@@ -4219,7 +4286,7 @@ class Resampler(nn.Module):
         else:
             self.kv_proj = nn.Identity()
 
-        norm_layer=partial(nn.LayerNorm, eps=1e-6)
+        norm_layer = partial(nn.LayerNorm, eps=1e-6)
         self.attn = MultiheadAttention(embed_dim, num_heads)
         self.ln_q = norm_layer(embed_dim)
         self.ln_kv = norm_layer(embed_dim)
@@ -5126,10 +5193,14 @@ class MiniCPMVisionEncoder(nn.Module):
 
         if not return_dict:
             return tuple(v for v in [hidden_states, encoder_states, all_attentions] if v is not None)
-        return BaseModelOutput(last_hidden_state=hidden_states, hidden_states=encoder_states, attentions=all_attentions)
+        return BaseModelOutput(
+            last_hidden_state=hidden_states, hidden_states=encoder_states, attentions=all_attentions
+        )
 
 
-@add_start_docstrings("""The vision model from SigLIP without any head or projection on top.""", SIGLIP_START_DOCSTRING)
+@add_start_docstrings(
+    """The vision model from SigLIP without any head or projection on top.""", SIGLIP_START_DOCSTRING
+)
 class MiniCPMVisionTransformer(SiglipPreTrainedModel):
     config_class = SiglipVisionConfig
     main_input_name = "pixel_values"
@@ -5221,5 +5292,6 @@ class MiniCPMVisionTransformer(SiglipPreTrainedModel):
             hidden_states=encoder_outputs.hidden_states,
             attentions=encoder_outputs.attentions,
         )
+
 
 __all__ = ["MiniCPM_o_2_6ForConditionalGeneration", "MiniCPM_o_2_6Model", "MiniCPM_o_2_6PreTrainedModel"]
