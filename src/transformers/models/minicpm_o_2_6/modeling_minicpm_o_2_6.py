@@ -2247,7 +2247,6 @@ class MiniCPM_o_2_6Model(MiniCPM_o_2_6PreTrainedModel, GenerationMixin):
             logger.info(f"Audio saved to {output_path}")
         return wav_numpy, sr
 
-
 class MiniCPMWhisperAttention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
