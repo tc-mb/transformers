@@ -16,9 +16,11 @@
 import math
 from typing import List, Optional, Union
 
-from transformers import WhisperFeatureExtractor, AutoFeatureExtractor, AutoTokenizer
+from ... import AutoFeatureExtractor, AutoTokenizer
 import numpy as np
 import torch
+
+from ..whisper.feature_extraction_whisper import WhisperFeatureExtractor
 
 
 class MiniCPM_o_2_6FeatureExtractor(WhisperFeatureExtractor):

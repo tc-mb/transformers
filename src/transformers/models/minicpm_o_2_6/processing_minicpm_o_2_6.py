@@ -29,13 +29,12 @@ import json
 from copy import deepcopy
 
 from PIL import Image
-from transformers.image_utils import ImageInput
-from transformers.processing_utils import ProcessorMixin, ProcessingKwargs, Unpack, ImagesKwargs, AudioKwargs
-from transformers.tokenization_utils_base import PreTokenizedInput, TextInput
-from transformers.utils import logging, TensorType
+from ...image_utils import ImageInput
+from ...processing_utils import ProcessorMixin, ProcessingKwargs, Unpack, ImagesKwargs, AudioKwargs
+from ...tokenization_utils_base import PreTokenizedInput, TextInput
 
 from ...feature_extraction_utils import BatchFeature
-from ...utils import is_torch_device, is_torch_dtype, requires_backends, TensorType
+from ...utils import is_torch_device, is_torch_dtype, requires_backends, TensorType, logging
 
 logger = logging.get_logger(__name__)
 
