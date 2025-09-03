@@ -69,7 +69,6 @@ class MiniCPMVImageProcessorFast(BaseImageProcessorFast):
             image_mean if image_mean is not None else IMAGENET_STANDARD_MEAN)
         self.image_std = np.array(
             image_std if image_std is not None else IMAGENET_STANDARD_STD)
-        self.version = kwargs.pop("version", 2.0)
 
     def ensure_divide(self, length, patch_size):
         return max(round(length / patch_size) * patch_size, patch_size)

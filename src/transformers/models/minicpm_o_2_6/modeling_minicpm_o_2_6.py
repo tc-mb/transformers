@@ -81,7 +81,7 @@ from .configuration_minicpm_o_2_6 import (
     MiniCPMVisionConfig,
     MiniCPMWhisperConfig,
 )
-from .processing_minicpm_o_2_6 import NumberToTextConverter, VoiceChecker, sentence_end
+from .tts_processing_minicpm_o_2_6 import ChatTTSProcessor, NumberToTextConverter, VoiceChecker, sentence_end
 
 
 if is_flash_attn_2_available():
@@ -607,8 +607,6 @@ class MiniCPM_o_2_6ForConditionalGeneration(MiniCPM_o_2_6PreTrainedModel, Genera
         load tts tokenizer and vocos
         1. try load form local 2. try load from huggingface
         """
-        from .processing_minicpm_o_2_6 import ChatTTSProcessor
-
         if tts_text_tokenizer_path is None:
             tts_text_tokenizer_path = os.path.join(self.omni_config._name_or_path, "assets/chattts_tokenizer")
         if not os.path.exists(tts_text_tokenizer_path):

@@ -76,7 +76,7 @@ from ..qwen2.modeling_qwen2 import Qwen2Model, Qwen2PreTrainedModel
 from ..llama.configuration_llama import LlamaConfig
 from ..llama.modeling_llama import LlamaModel, LlamaDecoderLayer, LlamaPreTrainedModel
 
-from .processing_minicpm_o_2_6 import NumberToTextConverter, sentence_end, VoiceChecker
+from .tts_processing_minicpm_o_2_6 import NumberToTextConverter, sentence_end, VoiceChecker, ChatTTSProcessor
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_func, flash_attn_varlen_func
@@ -321,8 +321,6 @@ class MiniCPM_o_2_6ForConditionalGeneration(MiniCPM_o_2_6PreTrainedModel, Genera
         load tts tokenizer and vocos
         1. try load form local 2. try load from huggingface
         """
-        from .processing_minicpm_o_2_6 import ChatTTSProcessor
-
         if tts_text_tokenizer_path is None:
             tts_text_tokenizer_path = os.path.join(self.omni_config._name_or_path, "assets/chattts_tokenizer")
         if not os.path.exists(tts_text_tokenizer_path):
