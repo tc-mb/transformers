@@ -54,16 +54,15 @@ from ...utils import (
     TransformersKwargs,
 )
 from ...cache_utils import Cache, DynamicCache, EncoderDecoderCache, StaticCache
+from ...configuration_utils import PretrainedConfig
 from ...generation import GenerationMixin
 from ...generation.streamers import TextIteratorStreamer
 from ...generation.utils import GenerateOutput
 from ...generation.logits_process import LogitsProcessor, TopKLogitsWarper, TopPLogitsWarper
-from ...modeling_layers import GradientCheckpointingLayer
-from ...modeling_rope_utils import ROPE_INIT_FUNCTIONS, dynamic_rope_update
 from ...modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from ...activations import ACT2FN
 from ...modeling_attn_mask_utils import _prepare_4d_attention_mask, AttentionMaskConverter
-from ...integrations import is_deepspeed_zero3_enabled, use_kernel_forward_from_hub
+from ...integrations import is_deepspeed_zero3_enabled
 from ...modeling_flash_attention_utils import FlashAttentionKwargs
 from ...processing_utils import Unpack
 
@@ -72,7 +71,9 @@ from ..siglip.configuration_siglip import SiglipVisionConfig
 from ..siglip.modeling_siglip import SiglipEncoderLayer, SiglipEncoder, SiglipMLP, SiglipVisionModelOutput
 from ..whisper.configuration_whisper import WhisperConfig
 from ..whisper.modeling_whisper import WhisperEncoder, WhisperAttention, WhisperEncoderLayer
+from ..qwen2.configuration_qwen2 import Qwen2Config
 from ..qwen2.modeling_qwen2 import Qwen2Model, Qwen2PreTrainedModel
+from ..llama.configuration_llama import LlamaConfig
 from ..llama.modeling_llama import LlamaModel, LlamaDecoderLayer, LlamaPreTrainedModel
 
 try:
@@ -84,14 +85,161 @@ try:
 except:
     _tts_deps = False
 
-from .configuration_minicpm_o_2_6 import (
-    MiniCPM_o_2_6Config,
-    MiniCPMConditionalTTSConfig,
-    MiniCPMConditionalTTSTextConfig,
-)
 from .processing_minicpm_o_2_6 import NumberToTextConverter, sentence_end, VoiceChecker
 
 logger = logging.get_logger(__name__)
+
+class MiniCPMConditionalTTSTextConfig(LlamaConfig):
+    pass
+
+
+class MiniCPMConditionalTTSConfig(PretrainedConfig):
+    model_type = "conditional_chattts"
+
+    # sub_configs = {
+    #     "text_config": MiniCPMConditionalTTSTextConfig,
+    # }
+
+    def __init__(
+        self,
+        llm_dim: int = 2560,
+        hidden_size: int = 768,
+        intermediate_size: int = 3072,
+        num_attention_heads: int = 12,
+        num_hidden_layers: int = 20,
+        max_position_embeddings: int = 4096,
+        num_audio_tokens: int = 626,
+        num_text_tokens: int = 21178,
+        num_mel_bins: int = 100,
+        num_vq: int = 4,
+        use_speaker_embedding: bool = True,
+        use_llm_hidden_state: bool = False,
+        spk_emb_token_id: int = 21143,
+        num_spk_embs: int = 1,
+        audio_bos_token_id: int = 21132,
+        text_eos_token_id: int = 21133,
+        use_text: bool = True,
+        streaming: bool = True,
+        streaming_text_chunk_size: int = 10,
+        streaming_text_reserved_len: int = 300,
+        streaming_audio_chunk_size: int = 50,
+        attn_implementation: str = "sdpa",
+        use_mlp: bool = True,
+        aug_loss_weight: bool = True,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        self.llm_dim = llm_dim
+        self.hidden_size = hidden_size
+        self.intermediate_size = intermediate_size
+        self.num_attention_heads = num_attention_heads
+        self.num_hidden_layers = num_hidden_layers
+        self.max_position_embeddings = max_position_embeddings
+        self.num_audio_tokens = num_audio_tokens
+        self.num_text_tokens = num_text_tokens
+        self.num_mel_bins = num_mel_bins
+        self.num_vq = num_vq
+        self.use_speaker_embedding = use_speaker_embedding
+        self.use_llm_hidden_state = use_llm_hidden_state
+        self.spk_emb_token_id = spk_emb_token_id
+        self.num_spk_embs = num_spk_embs
+        self.audio_bos_token_id = audio_bos_token_id
+        self.text_eos_token_id = text_eos_token_id
+        self.use_text = use_text
+        self.streaming = streaming
+        self.streaming_text_chunk_size = streaming_text_chunk_size
+        self.streaming_text_reserved_len = streaming_text_reserved_len
+        self.streaming_audio_chunk_size = streaming_audio_chunk_size
+        self.attn_implementation = attn_implementation
+        self.use_mlp = use_mlp
+        self.aug_loss_weight = aug_loss_weight
+
+        self.tts_text_config = MiniCPMConditionalTTSTextConfig(
+            hidden_size=self.hidden_size,
+            intermediate_size=self.intermediate_size,
+            num_attention_heads=self.num_attention_heads,
+            num_hidden_layers=self.num_hidden_layers,
+            max_position_embeddings=self.max_position_embeddings,
+            attn_implementation=self.attn_implementation,
+        )
+
+
+class MiniCPM_o_2_6TextConfig(Qwen2Config):
+    model_type = "minicpmo"
+
+class MiniCPMVisionConfig(SiglipVisionConfig):
+    pass
+
+class MiniCPMWhisperConfig(WhisperConfig):
+    pass 
+
+class MiniCPM_o_2_6Config(PretrainedConfig):
+
+    default_vision_config = {
+        "hidden_size": 1152,
+        "image_size": 980,
+        "intermediate_size": 4304,
+        "model_type": "siglip",
+        "num_attention_heads": 16,
+        "num_hidden_layers": 27,
+        "patch_size": 14,
+    }
+
+    def __init__(
+        self,
+        text_config=None,
+        vision_config=None,
+        audio_config=None,
+        tts_config=None,
+        use_cache=True,
+        query_num=64,
+        drop_vision_last_layer=True,
+        vision_batch_size=16,
+        audio_pool_step=2,
+        audio_chunk_length=1.0,
+        **kwargs,
+    ):
+        self.use_cache = use_cache
+        self.query_num = query_num
+        self.drop_vision_last_layer = drop_vision_last_layer
+        self.vision_batch_size = vision_batch_size
+        self.audio_pool_step = audio_pool_step
+        self.audio_chunk_length = audio_chunk_length
+
+        if text_config is None:
+            self.text_config = MiniCPM_o_2_6TextConfig()
+        elif isinstance(text_config, dict):
+            self.text_config = MiniCPM_o_2_6TextConfig(**text_config)
+        elif isinstance(text_config, MiniCPM_o_2_6TextConfig):
+            self.text_config = text_config
+
+        if vision_config is None:
+            self.vision_config = MiniCPMVisionConfig(
+                **self.default_vision_config)
+            logger.info("vision_config is None, using default vision config")
+        elif isinstance(vision_config, dict):
+            self.vision_config = MiniCPMVisionConfig(**vision_config)
+        elif isinstance(vision_config, MiniCPMVisionConfig):
+            self.vision_config = vision_config
+
+        # same as openai/whisper-medium add use_cache
+        if audio_config is None:
+            self.audio_config = MiniCPMWhisperConfig()
+        elif isinstance(audio_config, dict):
+            self.audio_config = MiniCPMWhisperConfig(**audio_config)
+        elif isinstance(audio_config, MiniCPMWhisperConfig):
+            self.audio_config = audio_config
+
+        if tts_config is None:
+            self.tts_config = MiniCPMConditionalTTSConfig()
+        elif isinstance(tts_config, dict):
+            self.tts_config = MiniCPMConditionalTTSConfig(**tts_config)
+        elif isinstance(tts_config, MiniCPMConditionalTTSConfig):
+            self.tts_config = tts_config
+
+        # self.patch_size = self.vision_config.patch_size
+        super().__init__(**kwargs)
 
 
 @dataclass
@@ -1892,7 +2040,7 @@ class MiniCPMWhisperAttention(WhisperAttention):
 
 # Copied from transformers.models.whisper.modeling_whisper.WhisperEncoderLayer and add use_cache for streaming inference
 class MiniCPMWhisperEncoderLayer(WhisperEncoderLayer):
-    def __init__(self, config: WhisperConfig, layer_idx: int = None):
+    def __init__(self, config: MiniCPMWhisperConfig, layer_idx: int = None):
         super().__init__()
         self.embed_dim = config.d_model
         self.self_attn = MiniCPMWhisperAttention(
@@ -1976,7 +2124,7 @@ class MiniCPMWhisperEncoderLayer(WhisperEncoderLayer):
 
 # Copied from from transformers.models.whisper.modeling_whisper.WhisperEncoder and add use_cache for streaming inference
 class MiniCPMWhisperEncoder(WhisperEncoder):
-    def __init__(self, config: WhisperConfig):
+    def __init__(self, config: MiniCPMWhisperConfig):
         super().__init__(config)
         self.layers = nn.ModuleList(
             [MiniCPMWhisperEncoderLayer(config, layer_idx=i) for i in range(config.encoder_layers)]
@@ -2061,7 +2209,7 @@ class MiniCPMWhisperEncoder(WhisperEncoder):
                 only present if their respective `output_*` arguments are set to `True`.
 
         Example:
-            >>> from transformers import AutoFeatureExtractor, WhisperConfig, WhisperForConditionalGeneration
+            >>> from transformers import AutoFeatureExtractor, MiniCPMWhisperConfig, WhisperForConditionalGeneration
             >>> import torch
 
             >>> # Load a feature extractor and a Whisper model
@@ -3935,7 +4083,7 @@ class MiniCPMVisionModelOutput(SiglipVisionModelOutput):
 
 
 class MiniCPMVisionEmbedding(nn.Module):
-    def __init__(self, config: SiglipVisionConfig):
+    def __init__(self, config: MiniCPMVisionConfig):
         super().__init__()
         self.config = config
         self.embed_dim = config.hidden_size
@@ -4268,7 +4416,7 @@ class MiniCPMVisionMLP(SiglipMLP):
 
 
 class MiniCPMVisionEncoderLayer(SiglipEncoderLayer):
-    def __init__(self, config: SiglipVisionConfig):
+    def __init__(self, config: MiniCPMVisionConfig):
         super().__init__()
         self.embed_dim = config.hidden_size
         self._use_flash_attention_2 = config._attn_implementation == "flash_attention_2"
@@ -4286,7 +4434,7 @@ class MiniCPMVisionPreTrainedModel(PreTrainedModel):
     models.
     """
 
-    config_class = SiglipVisionConfig
+    config_class = MiniCPMVisionConfig
     base_model_prefix = "siglip"
     supports_gradient_checkpointing = True
 
@@ -4329,7 +4477,7 @@ SIGLIP_START_DOCSTRING = r"""
     Use it as a regular PyTorch Module and refer to the PyTorch documentation for all matter related to general usage
     and behavior.
     Parameters:
-        config ([`SiglipVisionConfig`]): Model configuration class with all the parameters of the model.
+        config ([`MiniCPMVisionConfig`]): Model configuration class with all the parameters of the model.
             Initializing with a config file does not load the weights associated with the model, only the
             configuration. Check out the [`~PreTrainedModel.from_pretrained`] method to load the model weights.
 """
@@ -4356,10 +4504,10 @@ class MiniCPMVisionEncoder(SiglipEncoder):
     Transformer encoder consisting of `config.num_hidden_layers` self attention layers. Each layer is a
     [`SiglipEncoderLayer`].
     Args:
-        config: SiglipConfig
+        config: MiniCPMVisionConfig
     """
 
-    def __init__(self, config: SiglipVisionConfig):
+    def __init__(self, config: MiniCPMVisionConfig):
         super().__init__()
         self.config = config
         self.layers = nn.ModuleList([MiniCPMVisionEncoderLayer(config) for _ in range(config.num_hidden_layers)])
@@ -4440,12 +4588,12 @@ class MiniCPMVisionEncoder(SiglipEncoder):
     """The vision model from SigLIP without any head or projection on top.""", SIGLIP_START_DOCSTRING
 )
 class MiniCPMVisionTransformer(MiniCPMVisionPreTrainedModel):
-    config_class = SiglipVisionConfig
+    config_class = MiniCPMVisionConfig
     main_input_name = "pixel_values"
     _supports_flash_attn_2 = True
     _no_split_modules = []
 
-    def __init__(self, config: SiglipVisionConfig):
+    def __init__(self, config: MiniCPMVisionConfig):
         super().__init__(config)
         self.config = config
         embed_dim = config.hidden_size
@@ -4462,7 +4610,7 @@ class MiniCPMVisionTransformer(MiniCPMVisionPreTrainedModel):
         return self.embeddings.patch_embedding
 
     @add_start_docstrings_to_model_forward(SIGLIP_VISION_INPUTS_DOCSTRING)
-    @replace_return_docstrings(output_type=BaseModelOutputWithPooling, config_class=SiglipVisionConfig)
+    @replace_return_docstrings(output_type=BaseModelOutputWithPooling, config_class=MiniCPMVisionConfig)
     def forward(
         self,
         pixel_values,
@@ -4532,4 +4680,4 @@ class MiniCPMVisionTransformer(MiniCPMVisionPreTrainedModel):
         )
 
 
-__all__ = ["MiniCPM_o_2_6ForConditionalGeneration", "MiniCPM_o_2_6TextModel", "MiniCPM_o_2_6PreTrainedModel"]
+__all__ = ["MiniCPM_o_2_6ForConditionalGeneration", "MiniCPM_o_2_6TextModel", "MiniCPM_o_2_6PreTrainedModel", "MiniCPM_o_2_6Config"]

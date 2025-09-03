@@ -72,14 +72,14 @@ from ...utils import (
     replace_return_docstrings,
 )
 from ...utils.deprecation import deprecate_kwarg
-from ..whisper.configuration_whisper import WhisperConfig
-from ..siglip.configuration_siglip import SiglipVisionConfig
 from ..bert.tokenization_bert_fast import BertTokenizerFast
 from ...utils.generic import check_model_inputs
 from .configuration_minicpm_o_2_6 import (
     MiniCPM_o_2_6Config,
     MiniCPMConditionalTTSConfig,
     MiniCPMConditionalTTSTextConfig,
+    MiniCPMVisionConfig,
+    MiniCPMWhisperConfig,
 )
 from .processing_minicpm_o_2_6 import NumberToTextConverter, VoiceChecker, sentence_end
 
@@ -2361,7 +2361,7 @@ class MiniCPMWhisperAttention(nn.Module):
 
 
 class MiniCPMWhisperEncoderLayer(GradientCheckpointingLayer):
-    def __init__(self, config: WhisperConfig, layer_idx: int = None):
+    def __init__(self, config: MiniCPMWhisperConfig, layer_idx: int = None):
         super().__init__()
         self.embed_dim = config.d_model
         self.self_attn = MiniCPMWhisperAttention(
@@ -2464,7 +2464,7 @@ class MiniCPMWhisperEncoder(MiniCPM_o_2_6PreTrainedModel):
         config: MiniCPMWhisperConfig
     """
 
-    def __init__(self, config: WhisperConfig):
+    def __init__(self, config: MiniCPMWhisperConfig):
         super().__init__(config)
         self.dropout = config.dropout
         self.layerdrop = config.encoder_layerdrop
@@ -2579,7 +2579,7 @@ class MiniCPMWhisperEncoder(MiniCPM_o_2_6PreTrainedModel):
                 only present if their respective `output_*` arguments are set to `True`.
 
         Example:
-            >>> from transformers import AutoFeatureExtractor, WhisperConfig, WhisperForConditionalGeneration
+            >>> from transformers import AutoFeatureExtractor, MiniCPMWhisperConfig, WhisperForConditionalGeneration
             >>> import torch
 
             >>> # Load a feature extractor and a Whisper model
@@ -4428,7 +4428,7 @@ class MiniCPMVisionModelOutput(ModelOutput):
 
 
 class MiniCPMVisionEmbedding(nn.Module):
-    def __init__(self, config: SiglipVisionConfig):
+    def __init__(self, config: MiniCPMVisionConfig):
         super().__init__()
         self.config = config
         self.embed_dim = config.hidden_size
@@ -4785,7 +4785,7 @@ class MiniCPMVisionMLP(nn.Module):
 
 
 class MiniCPMVisionEncoderLayer(GradientCheckpointingLayer):
-    def __init__(self, config: SiglipVisionConfig):
+    def __init__(self, config: MiniCPMVisionConfig):
         super().__init__()
         self.embed_dim = config.hidden_size
         self.layer_norm1 = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
@@ -4948,7 +4948,7 @@ class MiniCPMVisionPreTrainedModel(PreTrainedModel):
     models.
     """
 
-    config_class = SiglipVisionConfig
+    config_class = MiniCPMVisionConfig
     base_model_prefix = "siglip"
     supports_gradient_checkpointing = True
 
@@ -4988,10 +4988,10 @@ class MiniCPMVisionEncoder(nn.Module):
     Transformer encoder consisting of `config.num_hidden_layers` self attention layers. Each layer is a
     [`SiglipEncoderLayer`].
     Args:
-        config: SiglipConfig
+        config: MiniCPMVisionConfig
     """
 
-    def __init__(self, config: SiglipVisionConfig):
+    def __init__(self, config: MiniCPMVisionConfig):
         super().__init__()
         self.config = config
         self.layers = nn.ModuleList([MiniCPMVisionEncoderLayer(config) for _ in range(config.num_hidden_layers)])
@@ -5077,7 +5077,7 @@ SIGLIP_START_DOCSTRING = r"""
     Use it as a regular PyTorch Module and refer to the PyTorch documentation for all matter related to general usage
     and behavior.
     Parameters:
-        config ([`SiglipVisionConfig`]): Model configuration class with all the parameters of the model.
+        config ([`MiniCPMVisionConfig`]): Model configuration class with all the parameters of the model.
             Initializing with a config file does not load the weights associated with the model, only the
             configuration. Check out the [`~PreTrainedModel.from_pretrained`] method to load the model weights.
 """
@@ -5103,12 +5103,12 @@ SIGLIP_VISION_INPUTS_DOCSTRING = r"""
     """The vision model from SigLIP without any head or projection on top.""", SIGLIP_START_DOCSTRING
 )
 class MiniCPMVisionTransformer(MiniCPMVisionPreTrainedModel):
-    config_class = SiglipVisionConfig
+    config_class = MiniCPMVisionConfig
     main_input_name = "pixel_values"
     _supports_flash_attn_2 = True
     _no_split_modules = []
 
-    def __init__(self, config: SiglipVisionConfig):
+    def __init__(self, config: MiniCPMVisionConfig):
         super().__init__(config)
         self.config = config
         embed_dim = config.hidden_size
@@ -5125,7 +5125,7 @@ class MiniCPMVisionTransformer(MiniCPMVisionPreTrainedModel):
         return self.embeddings.patch_embedding
 
     @add_start_docstrings_to_model_forward(SIGLIP_VISION_INPUTS_DOCSTRING)
-    @replace_return_docstrings(output_type=BaseModelOutputWithPooling, config_class=SiglipVisionConfig)
+    @replace_return_docstrings(output_type=BaseModelOutputWithPooling, config_class=MiniCPMVisionConfig)
     def forward(
         self,
         pixel_values,
