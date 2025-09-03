@@ -20,7 +20,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
 from threading import Thread
-from typing import List, Optional, Tuple, Union, Callable
+from typing import Optional, Union, Callable
 
 import numpy as np
 from PIL import Image
@@ -246,7 +246,7 @@ class MiniCPM_o_2_6Config(PretrainedConfig):
 
 @dataclass
 class OmniOutput(ModelOutput):
-    text: Optional[Union[str, List[str], Iterator]] = None
+    text: Optional[Union[str, list[str], Iterator]] = None
     outputs: GenerateOutput | torch.LongTensor = None
     spk_embeds: Optional[torch.FloatTensor] = None
     audio_wav: Optional[np.ndarray] = None
@@ -577,7 +577,7 @@ class MiniCPM_o_2_6ForConditionalGeneration(MiniCPM_o_2_6PreTrainedModel, Genera
         return new_vllm_embedding, vision_hidden_states
 
     def get_audio_embedding_streaming(
-        self, audio_features: torch.FloatTensor = [], audio_feature_lens_raw: List[List[int]] = []
+        self, audio_features: torch.FloatTensor = [], audio_feature_lens_raw: list[list[int]] = []
     ):
         r"""
         Extract audio embeddings in a streaming manner using cached key-value pairs.
@@ -638,7 +638,7 @@ class MiniCPM_o_2_6ForConditionalGeneration(MiniCPM_o_2_6PreTrainedModel, Genera
     def get_audio_embedding(
         self,
         audio_features: torch.FloatTensor = [],
-        audio_feature_lens_raw: List[List[int]] = [],
+        audio_feature_lens_raw: list[list[int]] = [],
         chunk_length=-1,
         dummy=True,
     ):
@@ -1512,7 +1512,7 @@ class MiniCPM_o_2_6ForConditionalGeneration(MiniCPM_o_2_6PreTrainedModel, Genera
         mel_spec = self.tts.decode_to_mel_specs(outputs.new_ids)
         return mel_spec
 
-    def _linear_overlap_add2_wav(self, frames: List[torch.Tensor], overlap: int):
+    def _linear_overlap_add2_wav(self, frames: list[torch.Tensor], overlap: int):
         """
         Merge two audio waveforms with smooth in streaming audio generation.
         Borrowed some codes from `https://github.com/huggingface/transformers/blob/main/src/transformers/models/encodec/modeling_encodec.py`
@@ -2448,7 +2448,7 @@ class GFSQ(nn.Module):
     def __init__(
         self,
         dim: int,
-        levels: List[int],
+        levels: list[int],
         G: int,
         R: int,
         eps=1e-5,
@@ -2746,14 +2746,14 @@ class ConditionalChatTTSGenerationOutput(ModelOutput):
     Args:
         new_ids (torch.LongTensor): Newly generated audio code sequence, shape (batch_size, sequence_length, num_vq).
         audio_input_ids (torch.LongTensor): Updated input IDs including condition and generated audio codes, shape (batch_size, full_sequence_length, num_vq).
-        past_key_values (Tuple[Tuple[torch.FloatTensor]]): Tuple containing pre-computed keys and values used for attention mechanism. Each element has shape (batch_size, num_heads, sequence_length, embed_size_per_head).
+        past_key_values (tuple[tuple[torch.FloatTensor]]): tuple containing pre-computed keys and values used for attention mechanism. Each element has shape (batch_size, num_heads, sequence_length, embed_size_per_head).
         finished (bool): Boolean indicating whether generation is complete.
 
     """
 
     new_ids: torch.LongTensor = None
     audio_input_ids: torch.LongTensor = None
-    past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
+    past_key_values: Optional[tuple[tuple[torch.FloatTensor]]] = None
     finished: bool = None
 
 
@@ -3230,7 +3230,7 @@ class ConditionalChatTTS(PreTrainedModel):
         self,
         input_ids: torch.Tensor,
         position_ids: torch.LongTensor,
-        past_key_values: List[Tuple[torch.Tensor, torch.Tensor]],
+        past_key_values: list[tuple[torch.Tensor, torch.Tensor]],
         lm_spk_emb_last_hidden_states: Optional[torch.Tensor] = None,
     ):
         """Prefill a chunk of new text tokens in streaming setting.
@@ -3239,7 +3239,7 @@ class ConditionalChatTTS(PreTrainedModel):
         Args:
             input_ids (Tensor): Tensor of shape [batch_size, seq_len]
             position_ids (LongTensor): Tensor of shape [batch_size, seq_len]
-            past_key_values (List[Tuple[Tensor]]): KV Cache of all layers, each layer is a tuple (Tensor, Tensor) denoting keys and values. Each tensor is of seq_len = `self.streaming_text_reserved_len`. `past_key_values` will be updated.
+            past_key_values (List[tuple[Tensor]]): KV Cache of all layers, each layer is a tuple (Tensor, Tensor) denoting keys and values. Each tensor is of seq_len = `self.streaming_text_reserved_len`. `past_key_values` will be updated.
             lm_spk_emb_last_hidden_states (Tensor, optional): Tensor of shape [batch_size, num_spk_emb, llm_dim]. Defaults to None.
             lm_last_hidden_states (Tensor, optional): _description_. Defaults to None.
 
@@ -3304,7 +3304,7 @@ class ConditionalChatTTS(PreTrainedModel):
     def prefill_audio_ids(
         self,
         input_ids: torch.Tensor,
-        past_key_values: List[Tuple[torch.Tensor, torch.Tensor]],
+        past_key_values: list[tuple[torch.Tensor, torch.Tensor]],
         streaming_tts_text_mask=None,
         add_audio_bos: bool = True,
     ):
@@ -3313,7 +3313,7 @@ class ConditionalChatTTS(PreTrainedModel):
 
         Args:
             input_ids (torch.Tensor): (1, seq_len, num_vq) Audio input token ids.
-            past_key_values (List[Tuple[torch.Tensor, torch.Tensor]]): Past key values for attention mechanism.
+            past_key_values (List[tuple[torch.Tensor, torch.Tensor]]): Past key values for attention mechanism.
         """
         assert input_ids.shape[0] == 1
         assert past_key_values is not None
@@ -3359,15 +3359,15 @@ class ConditionalChatTTS(PreTrainedModel):
     def generate(
         self,
         input_ids: torch.Tensor,
-        past_key_values: List[Tuple[torch.Tensor, torch.Tensor]],
+        past_key_values: list[tuple[torch.Tensor, torch.Tensor]],
         temperature: torch.Tensor,
         eos_token: Union[int, torch.Tensor],
         streaming_tts_text_mask=None,
         force_no_stop=False,
         min_new_token=10,
         max_new_token=50,
-        logits_warpers: List[LogitsProcessor] = [],
-        logits_processors: List[CustomRepetitionPenaltyLogitsProcessorRepeat] = [],
+        logits_warpers: list[LogitsProcessor] = [],
+        logits_processors: list[CustomRepetitionPenaltyLogitsProcessorRepeat] = [],
         show_tqdm=False,
     ):
         """Generate audio codes in streaming setting or non-streaming setting.
@@ -3379,7 +3379,7 @@ class ConditionalChatTTS(PreTrainedModel):
 
         Args:
             input_ids (torch.Tensor): Input token ids.
-            past_key_values (List[Tuple[torch.Tensor, torch.Tensor]]): Past key values for attention mechanism.
+            past_key_values (List[tuple[torch.Tensor, torch.Tensor]]): Past key values for attention mechanism.
             temperature (torch.Tensor): Temperature for sampling.
             eos_token (Union[int, torch.Tensor]): End of sequence token.
             streaming_tts_text_mask (Optional[torch.Tensor], optional): Mask for streaming TTS text. Defaults to None.
@@ -3595,7 +3595,7 @@ class ConditionalChatTTS(PreTrainedModel):
     @torch.inference_mode()
     def decode_to_mel_specs(
         self,
-        result_list: List[torch.Tensor],
+        result_list: list[torch.Tensor],
     ):
         """Decode discrete audio codes to mel spectrograms.
 
@@ -4068,11 +4068,11 @@ class MiniCPMVisionModelOutput(SiglipVisionModelOutput):
         last_hidden_state (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`):
             Sequence of hidden-states at the output of the last layer of the model.
         hidden_states (`tuple(torch.FloatTensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
-            Tuple of `torch.FloatTensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            tuple of `torch.FloatTensor` (one for the output of the embeddings, if the model has an embedding layer, +
             one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
             Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
         attentions (`tuple(torch.FloatTensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
-            Tuple of `torch.FloatTensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            tuple of `torch.FloatTensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
             sequence_length)`.
             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
             heads.
@@ -4175,7 +4175,7 @@ class MiniCPMVisionAttention(nn.Module):
         hidden_states: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         output_attentions: Optional[bool] = False,
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor], Optional[tuple[torch.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
 
         batch_size, q_len, _ = hidden_states.size()
@@ -4239,11 +4239,11 @@ class MiniCPMVisionFlashAttention2(MiniCPMVisionAttention):
         hidden_states: torch.Tensor,
         attention_mask: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
-        past_key_value: Optional[Tuple[torch.Tensor]] = None,
+        past_key_value: Optional[tuple[torch.Tensor]] = None,
         output_attentions: bool = False,
         use_cache: bool = False,
         **kwargs,
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor], Optional[tuple[torch.Tensor]]]:
         output_attentions = False
 
         bsz, q_len, _ = hidden_states.size()
@@ -4520,7 +4520,7 @@ class MiniCPMVisionEncoder(SiglipEncoder):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ) -> Union[Tuple, BaseModelOutput]:
+    ) -> Union[tuple, BaseModelOutput]:
         r"""
         Args:
             inputs_embeds (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`):
@@ -4618,7 +4618,7 @@ class MiniCPMVisionTransformer(MiniCPMVisionPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ) -> Union[Tuple, BaseModelOutputWithPooling]:
+    ) -> Union[tuple, BaseModelOutputWithPooling]:
         r"""
         Returns:
         """

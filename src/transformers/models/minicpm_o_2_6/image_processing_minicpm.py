@@ -14,18 +14,20 @@
 # limitations under the License.
 
 import math
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
-import torchvision.transforms as transforms
 from PIL import Image
 from ...image_processing_utils import BaseImageProcessor
 from ...image_transforms import to_pil_image
 from ...image_utils import valid_images, make_nested_list_of_images
 from ...utils import TensorType, IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
+from ...utils.import_utils import is_torchvision_available
 from .processing_minicpm_o_2_6 import MiniCPMOBatchFeature
 
+if is_torchvision_available():
+    import torchvision.transforms as transforms
 
 def recursive_converter(converter, value):
     if isinstance(value, list):
@@ -212,7 +214,7 @@ class MiniCPMVImageProcessor(BaseImageProcessor):
 
     def preprocess(
         self,
-        images: Union[Image.Image, List[Image.Image], List[List[Image.Image]]],
+        images: Union[Image.Image, list[Image.Image], list[list[Image.Image]]],
         do_pad: Optional[bool] = True,
         max_slice_nums: int = None,
         return_tensors: Optional[Union[str, TensorType]] = None,

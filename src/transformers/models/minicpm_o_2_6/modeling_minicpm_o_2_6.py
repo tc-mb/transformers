@@ -3005,7 +3005,7 @@ class ConditionalChatTTSGenerationOutput(ModelOutput):
     Args:
         new_ids (torch.LongTensor): Newly generated audio code sequence, shape (batch_size, sequence_length, num_vq).
         audio_input_ids (torch.LongTensor): Updated input IDs including condition and generated audio codes, shape (batch_size, full_sequence_length, num_vq).
-        past_key_values (Tuple[Tuple[torch.FloatTensor]]): Tuple containing pre-computed keys and values used for attention mechanism. Each element has shape (batch_size, num_heads, sequence_length, embed_size_per_head).
+        past_key_values (tuple[tuple[torch.FloatTensor]]): tuple containing pre-computed keys and values used for attention mechanism. Each element has shape (batch_size, num_heads, sequence_length, embed_size_per_head).
         finished (bool): Boolean indicating whether generation is complete.
 
     """
@@ -3736,7 +3736,7 @@ class ConditionalChatTTS(PreTrainedModel):
         Args:
             input_ids (Tensor): Tensor of shape [batch_size, seq_len]
             position_ids (LongTensor): Tensor of shape [batch_size, seq_len]
-            past_key_values (List[Tuple[Tensor]]): KV Cache of all layers, each layer is a tuple (Tensor, Tensor) denoting keys and values. Each tensor is of seq_len = `self.streaming_text_reserved_len`. `past_key_values` will be updated.
+            past_key_values (List[tuple[Tensor]]): KV Cache of all layers, each layer is a tuple (Tensor, Tensor) denoting keys and values. Each tensor is of seq_len = `self.streaming_text_reserved_len`. `past_key_values` will be updated.
             lm_spk_emb_last_hidden_states (Tensor, optional): Tensor of shape [batch_size, num_spk_emb, llm_dim]. Defaults to None.
             lm_last_hidden_states (Tensor, optional): _description_. Defaults to None.
 
@@ -3810,7 +3810,7 @@ class ConditionalChatTTS(PreTrainedModel):
 
         Args:
             input_ids (torch.Tensor): (1, seq_len, num_vq) Audio input token ids.
-            past_key_values (List[Tuple[torch.Tensor, torch.Tensor]]): Past key values for attention mechanism.
+            past_key_values (List[tuple[torch.Tensor, torch.Tensor]]): Past key values for attention mechanism.
         """
         assert input_ids.shape[0] == 1
         assert past_key_values is not None
@@ -3876,7 +3876,7 @@ class ConditionalChatTTS(PreTrainedModel):
 
         Args:
             input_ids (torch.Tensor): Input token ids.
-            past_key_values (List[Tuple[torch.Tensor, torch.Tensor]]): Past key values for attention mechanism.
+            past_key_values (List[tuple[torch.Tensor, torch.Tensor]]): Past key values for attention mechanism.
             temperature (torch.Tensor): Temperature for sampling.
             eos_token (Union[int, torch.Tensor]): End of sequence token.
             streaming_tts_text_mask (Optional[torch.Tensor], optional): Mask for streaming TTS text. Defaults to None.
@@ -4418,11 +4418,11 @@ class MiniCPMVisionModelOutput(ModelOutput):
         last_hidden_state (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`):
             Sequence of hidden-states at the output of the last layer of the model.
         hidden_states (`tuple(torch.FloatTensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
-            Tuple of `torch.FloatTensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            tuple of `torch.FloatTensor` (one for the output of the embeddings, if the model has an embedding layer, +
             one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
             Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
         attentions (`tuple(torch.FloatTensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
-            Tuple of `torch.FloatTensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            tuple of `torch.FloatTensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
             sequence_length)`.
             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
             heads.

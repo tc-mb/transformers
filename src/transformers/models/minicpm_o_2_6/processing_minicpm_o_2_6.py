@@ -19,7 +19,7 @@ Processor class for MiniCPMO.
 import math
 import re
 
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 import librosa
 import numpy as np
@@ -162,9 +162,9 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
 
     def __call__(
         self,
-        text: Union[TextInput, PreTokenizedInput, List[TextInput], List[PreTokenizedInput]],
+        text: Union[TextInput, PreTokenizedInput, list[TextInput], list[PreTokenizedInput]],
         images: ImageInput = None,
-        audios: Union[np.ndarray, List[np.ndarray], List[List[np.ndarray]]] = None,
+        audios: Union[np.ndarray, list[np.ndarray], list[list[np.ndarray]]] = None,
         **kwargs: Unpack[MiniCPM_o_2_6ProcessorKwargs],
     ) -> MiniCPMOBatchFeature:
         output_kwargs = self._merge_kwargs(MiniCPM_o_2_6ProcessorKwargs, self.tokenizer.init_kwargs, **kwargs)
@@ -454,7 +454,7 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
         self,
         images,
         audio_phs,
-        texts: Union[str, List[str]],
+        texts: Union[str, list[str]],
         truncation=None,
         max_length=None,
         max_slice_nums=None,

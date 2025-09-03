@@ -14,9 +14,8 @@
 # limitations under the License.
 
 import math
-from typing import List, Optional, Union
+from typing import Optional, Union
 
-from ... import AutoFeatureExtractor, AutoTokenizer
 import numpy as np
 import torch
 
@@ -47,7 +46,7 @@ class MiniCPM_o_2_6FeatureExtractor(WhisperFeatureExtractor):
 
     def __call__(
         self,
-        audios: Union[np.ndarray, List[np.ndarray], List[List[np.ndarray]]],
+        audios: Union[np.ndarray, list[np.ndarray], list[list[np.ndarray]]],
         audio_parts: Optional[list] = None,
         sampling_rate: Optional[int] = None,
         **kwargs,
