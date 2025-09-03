@@ -221,6 +221,7 @@ class MiniCPMVImageProcessorFast(BaseImageProcessorFast):
         images: Union[Image.Image, list[Image.Image], list[list[Image.Image]]],
         max_slice_nums: int = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
+        do_normalize: bool = True,
         **kwargs,
     ) -> MiniCPMOBatchFeature:
         # in batch inference, it may be [[]], so we can't use `make_nested_list_of_images`
@@ -257,8 +258,9 @@ class MiniCPMVImageProcessorFast(BaseImageProcessorFast):
                     # Convert PIL to tensor (0-1 range) and normalize
                     # Shape: [C, H, W], range [0, 1]
                     tensor_patch = F.to_tensor(patch)
-                    normalized_patch = F.normalize(tensor_patch, mean=self.image_mean.tolist(),
-                                                   std=self.image_std.tolist())  # Apply normalization
+                    if do_normalize:
+                        normalized_patch = F.normalize(tensor_patch, mean=self.image_mean.tolist(),
+                                                       std=self.image_std.tolist())  # Apply normalization
                     image_patches_tensors.append(normalized_patch)
 
                 # Convert back to numpy for compatibility with existing code
