@@ -179,13 +179,12 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
             image_inputs = None
 
         if audios:
-            audio_features, audio_feature_lens, audio_phs = self.feature_extractor(
-                self.tokenizer,
+            audio_features, audio_feature_lens = self.feature_extractor(
                 audios,
                 audio_parts=audio_kwargs["audio_parts"],
-                chunk_input=audio_kwargs["chunk_input"],
                 sampling_rate=audio_kwargs["sampling_rate"],
             )
+            audio_phs = self.get_audios_placeholder(audios=audios, chunk_input=audio_kwargs["chunk_input"])
         else:
             audio_features, audio_feature_lens, audio_phs = [], [], []
 
@@ -502,8 +501,8 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
             audio_id = 0
             for i, chunk in enumerate(text_chunks):
                 if chunk == self.tokenizer.image_tag:
-                    image_placeholder = self.image_processor.get_slice_image_placeholder(
-                        self.tokenizer, image_sizes[index][image_id], image_id, max_slice_nums, use_image_id
+                    image_placeholder = self.get_slice_image_placeholder(
+                        image_sizes[index][image_id], image_id, max_slice_nums, use_image_id
                     )
                     image_id += 1
                     text_chunks[i] = image_placeholder
@@ -552,6 +551,92 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
         }
 
         return data
+
+    def get_slice_image_placeholder(self, image_size, image_idx=0, max_slice_nums=None, use_image_id=None):
+        max_slice_nums = self.image_processor.max_slice_nums if max_slice_nums is None else int(max_slice_nums)
+        assert max_slice_nums > 0
+        grid = self.image_processor.get_sliced_grid(image_size=image_size, max_slice_nums=max_slice_nums)
+
+        image_placeholder = (
+            self.tokenizer.im_start
+            + self.tokenizer.unk_token * self.image_processor.image_feature_size
+            + self.tokenizer.im_end
+        )
+        use_image_id = self.image_processor.use_image_id if use_image_id is None else bool(use_image_id)
+        if use_image_id:
+            final_placeholder = (
+                f"{self.tokenizer.im_id_start}{image_idx}{self.tokenizer.im_id_end}" + image_placeholder
+            )
+        else:
+            final_placeholder = image_placeholder
+
+        if self.image_processor.slice_mode:
+            final_placeholder = final_placeholder + self.get_grid_placeholder(grid=grid)
+        return final_placeholder
+
+    def get_grid_placeholder(self, grid):
+        if grid is None:
+            return ""
+        slice_image_placeholder = (
+            self.tokenizer.slice_start
+            + self.tokenizer.unk_token * self.image_processor.image_feature_size
+            + self.tokenizer.slice_end
+        )
+
+        cols = grid[0]
+        rows = grid[1]
+        slices = []
+        for i in range(rows):
+            lines = []
+            for j in range(cols):
+                lines.append(slice_image_placeholder)
+            slices.append("".join(lines))
+
+        slice_placeholder = "\n".join(slices)
+        return slice_placeholder
+
+    def get_audios_placeholder(self, audios, 
+                               chunk_input: Optional[bool] = False, 
+                               chunk_length: Optional[int] = 1):
+        audios_list = self.feature_extractor.format_audios(audios)
+        audio_ph_list = []
+        for audios in audios_list:
+            if audios:
+                audio_ph_list.append(
+                    [self.get_single_audio_placeholder(len(a), chunk_input, chunk_length) for a in audios]
+                )
+            else:
+                audio_ph_list.append([])
+        return audio_ph_list
+
+    def get_single_audio_placeholder(self, audio_lens, chunk_input, chunk_length):
+        pool_step = 2
+        feature_lens = math.ceil(audio_lens / self.feature_extractor.hop_length)
+
+        feature_lens = (feature_lens - 1) // 2 + 1
+        output_lens = (feature_lens - pool_step) // pool_step + 1
+
+        if chunk_input:
+            fbank_feat_in_chunk = int(chunk_length * 100)
+            cnn_feat_in_chunk = (fbank_feat_in_chunk - 1) // 2 + 1
+            audio_embeds_in_chunk = (cnn_feat_in_chunk - pool_step) // pool_step + 1
+            num_audio_chunks = (output_lens + audio_embeds_in_chunk - 1) // audio_embeds_in_chunk
+
+            place_holders = ""
+            total_unk_len = 0
+            for _ in range(num_audio_chunks):
+                unk_len = min(audio_embeds_in_chunk, output_lens - total_unk_len)
+                place_holders += (
+                    self.tokenizer.audio_start + self.tokenizer.unk_token * unk_len + self.tokenizer.audio_end
+                )
+                total_unk_len += unk_len
+            audio_placeholder = place_holders
+        else:
+            audio_placeholder = (
+                self.tokenizer.audio_start + self.tokenizer.unk_token * output_lens + self.tokenizer.audio_end
+            )
+
+        return audio_placeholder
 
     @property
     # Copied from transformers.models.clip.processing_clip.CLIPProcessor.model_input_names
@@ -781,8 +866,8 @@ class VoiceChecker:
         num_chunks = len(audio_wav) // chunk_size
         mel_chunk_size = mel_spec.shape[-1] // num_chunks
         for i in range(num_chunks):
-            audio_chunk = audio_wav[i * chunk_size : (i + 1) * chunk_size]
-            mel_spec_chunk = mel_spec[:, i * mel_chunk_size : (i + 1) * mel_chunk_size]
+            audio_chunk = audio_wav[i * chunk_size: (i + 1) * chunk_size]
+            mel_spec_chunk = mel_spec[:, i * mel_chunk_size: (i + 1) * mel_chunk_size]
 
             distance = self.compute_distance(audio_chunk, mel_spec_chunk)
             logger.warning(
