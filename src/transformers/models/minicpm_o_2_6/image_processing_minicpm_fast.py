@@ -19,15 +19,19 @@ from typing import Optional, Union
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 from PIL import Image
-from ...image_processing_utils import BaseImageProcessor
+from ...image_processing_utils_fast import BaseImageProcessorFast
 from ...image_transforms import to_pil_image
 from ...image_utils import valid_images, make_nested_list_of_images
-from ...utils import TensorType, IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-from ...utils.import_utils import is_torchvision_available
+from ...utils import TensorType, IMAGENET_STANDARD_MEAN, IMAGENET_STANDARD_STD
+from ...utils.import_utils import is_torchvision_available, is_torchvision_v2_available
 from .processing_minicpm_o_2_6 import MiniCPMOBatchFeature
 
 if is_torchvision_available():
-    import torchvision.transforms as transforms
+    if is_torchvision_v2_available():
+        from torchvision.transforms.v2 import functional as F
+    else:
+        from torchvision.transforms import functional as F
+
 
 def recursive_converter(converter, value):
     if isinstance(value, list):
@@ -39,7 +43,7 @@ def recursive_converter(converter, value):
         return converter(value)
 
 
-class MiniCPMVImageProcessor(BaseImageProcessor):
+class MiniCPMVImageProcessorFast(BaseImageProcessorFast):
     model_input_names = ["pixel_values"]
 
     def __init__(
@@ -62,9 +66,9 @@ class MiniCPMVImageProcessor(BaseImageProcessor):
         self.slice_mode = kwargs.pop("slice_mode", True)
 
         self.image_mean = np.array(
-            image_mean if image_mean is not None else IMAGENET_DEFAULT_MEAN)
+            image_mean if image_mean is not None else IMAGENET_STANDARD_MEAN)
         self.image_std = np.array(
-            image_std if image_std is not None else IMAGENET_DEFAULT_STD)
+            image_std if image_std is not None else IMAGENET_STANDARD_STD)
         self.version = kwargs.pop("version", 2.0)
 
     def ensure_divide(self, length, patch_size):
@@ -215,7 +219,6 @@ class MiniCPMVImageProcessor(BaseImageProcessor):
     def preprocess(
         self,
         images: Union[Image.Image, list[Image.Image], list[list[Image.Image]]],
-        do_pad: Optional[bool] = True,
         max_slice_nums: int = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         **kwargs,
@@ -227,10 +230,6 @@ class MiniCPMVImageProcessor(BaseImageProcessor):
             images_list = [images]
         else:
             images_list = images
-
-        to_tensor = transforms.ToTensor()
-        normalize_transform = transforms.Normalize(
-            mean=self.image_mean.tolist(), std=self.image_std.tolist())
 
         new_images_list = []
         image_sizes_list = []
@@ -257,9 +256,9 @@ class MiniCPMVImageProcessor(BaseImageProcessor):
                 for patch in image_patches:
                     # Convert PIL to tensor (0-1 range) and normalize
                     # Shape: [C, H, W], range [0, 1]
-                    tensor_patch = to_tensor(patch)
-                    normalized_patch = normalize_transform(
-                        tensor_patch)  # Apply normalization
+                    tensor_patch = F.to_tensor(patch)
+                    normalized_patch = F.normalize(tensor_patch, mean=self.image_mean.tolist(),
+                                                   std=self.image_std.tolist())  # Apply normalization
                     image_patches_tensors.append(normalized_patch)
 
                 # Convert back to numpy for compatibility with existing code
@@ -280,10 +279,12 @@ class MiniCPMVImageProcessor(BaseImageProcessor):
             new_images_list.append(new_images)
             image_sizes_list.append(image_sizes)
             tgt_sizes_list.append(tgt_sizes)
+
         return MiniCPMOBatchFeature(
             data={"pixel_values": new_images_list,
                   "image_sizes": image_sizes_list, "tgt_sizes": tgt_sizes_list},
             tensor_type=return_tensors,
         )
 
-__all__ = ["MiniCPMVImageProcessor"]
+
+__all__ = ["MiniCPMVImageProcessorFast"]

@@ -152,7 +152,7 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
 
     attributes = ["tokenizer", "image_processor", "feature_extractor"]
     tokenizer_class = "AutoTokenizer"
-    image_processor_class = "AutoImageProcessor"
+    image_processor_class = "MiniCPMVImageProcessorFast"
     feature_extractor_class = "MiniCPM_o_2_6FeatureExtractor"
 
     def __init__(self, tokenizer=None, image_processor=None, feature_extractor=None, chat_template=None):
