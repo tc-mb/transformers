@@ -67,13 +67,13 @@ from ...utils import (
     add_start_docstrings_to_model_forward,
     auto_docstring,
     can_return_tuple,
-    is_flash_attn_2_available,
     logging,
     replace_return_docstrings,
 )
 from ...utils.deprecation import deprecate_kwarg
 from ..bert.tokenization_bert_fast import BertTokenizerFast
 from ...utils.generic import check_model_inputs
+from ...utils.import_utils import _is_package_available, is_flash_attn_2_available
 from .configuration_minicpm_o_2_6 import (
     MiniCPM_o_2_6Config,
     MiniCPMConditionalTTSConfig,
@@ -86,21 +86,12 @@ from .processing_minicpm_o_2_6 import NumberToTextConverter, VoiceChecker, sente
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_func, flash_attn_varlen_func
-    from flash_attn.bert_padding import (
-        index_first_axis,  # noqa
-        pad_input,
-        unpad_input,
-    )
+    from flash_attn.bert_padding import index_first_axis, pad_input, unpad_input
 
-try:
+if _is_package_available("vector_quantize_pytorch") and _is_package_available("vocos"):
     from vector_quantize_pytorch import GroupedResidualFSQ
     from vocos import Vocos
     from vocos.pretrained import instantiate_class
-
-    _tts_deps = True
-except:
-    _tts_deps = False
-
 
 logger = logging.get_logger(__name__)
 
@@ -479,6 +470,9 @@ class MiniCPM_o_2_6TextModel(MiniCPM_o_2_6PreTrainedModel):
             last_hidden_state=hidden_states,
             past_key_values=past_key_values if use_cache else None,
         )
+
+
+_tts_deps = _is_package_available("vector_quantize_pytorch") and _is_package_available("vocos")
 
 
 def _prepare_4d_causal_attention_mask_with_cache_position(
@@ -2234,6 +2228,36 @@ class MiniCPM_o_2_6ForConditionalGeneration(MiniCPM_o_2_6PreTrainedModel, Genera
         return wav_numpy, sr
 
 
+def whisper_eager_attention_forward(
+    module: nn.Module,
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    attention_mask: Optional[torch.Tensor],
+    scaling: Optional[float] = None,
+    dropout: float = 0.0,
+    head_mask: Optional[torch.Tensor] = None,
+    **kwargs,
+):
+    if scaling is None:
+        scaling = query.size(-1) ** -0.5
+
+    attn_weights = torch.matmul(query, key.transpose(2, 3)) * scaling
+    if attention_mask is not None and attention_mask.ndim == 4:
+        attn_weights = attn_weights + attention_mask[:, :, :, : key.shape[-2]]
+
+    attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+
+    if head_mask is not None:
+        attn_weights = attn_weights * head_mask.view(1, -1, 1, 1)
+
+    attn_weights = nn.functional.dropout(attn_weights, p=dropout, training=module.training)
+    attn_output = torch.matmul(attn_weights, value)
+    attn_output = attn_output.transpose(1, 2).contiguous()
+
+    return attn_output, attn_weights
+
+
 class MiniCPMWhisperAttention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
@@ -2337,7 +2361,7 @@ class MiniCPMWhisperAttention(nn.Module):
                     key_states, value_states, self.layer_idx, {"cache_position": cache_position}
                 )
 
-        attention_interface: Callable = eager_attention_forward
+        attention_interface: Callable = whisper_eager_attention_forward
         if self.config._attn_implementation != "eager":
             attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
 
@@ -3183,23 +3207,6 @@ class MiniCPMConditionalTTSTextPreTrainedModel(PreTrainedModel):
         "attentions": MiniCPMConditionalTTSTextAttention,
     }
     config_class = MiniCPMConditionalTTSTextConfig
-    _supports_flash_attn_2 = True
-    _supports_cache_class = True
-    _supports_quantized_cache = True
-    _supports_static_cache = True
-
-    def _init_weights(self, module):
-        std = self.config.initializer_range
-        if isinstance(module, nn.Linear):
-            module.weight.data.normal_(mean=0.0, std=std)
-            if module.bias is not None:
-                module.bias.data.zero_()
-        elif isinstance(module, nn.Embedding):
-            module.weight.data.normal_(mean=0.0, std=std)
-            if module.padding_idx is not None:
-                module.weight.data[module.padding_idx].zero_()
-        elif isinstance(module, MiniCPMConditionalTTSTextRMSNorm):
-            module.weight.data.fill_(1.0)
 
 
 class MiniCPMConditionalTTSTextRotaryEmbedding(nn.Module):

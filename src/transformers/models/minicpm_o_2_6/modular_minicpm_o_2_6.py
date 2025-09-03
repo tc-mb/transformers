@@ -43,16 +43,16 @@ from ...modeling_outputs import (
     CausalLMOutputWithPast,
 )
 from ...utils import (
-    ModelOutput,
+    logging,
     add_start_docstrings,
     add_start_docstrings_to_model_forward,
-    is_flash_attn_2_available,
-    logging,
     replace_return_docstrings,
     can_return_tuple,
     auto_docstring,
+    ModelOutput,
     TransformersKwargs,
 )
+from ...utils.import_utils import _is_package_available, is_flash_attn_2_available
 from ...cache_utils import Cache, DynamicCache, EncoderDecoderCache, StaticCache
 from ...configuration_utils import PretrainedConfig
 from ...generation import GenerationMixin
@@ -76,16 +76,18 @@ from ..qwen2.modeling_qwen2 import Qwen2Model, Qwen2PreTrainedModel
 from ..llama.configuration_llama import LlamaConfig
 from ..llama.modeling_llama import LlamaModel, LlamaDecoderLayer, LlamaPreTrainedModel
 
-try:
+from .processing_minicpm_o_2_6 import NumberToTextConverter, sentence_end, VoiceChecker
+
+if is_flash_attn_2_available():
+    from flash_attn import flash_attn_func, flash_attn_varlen_func
+    from flash_attn.bert_padding import index_first_axis, pad_input, unpad_input
+
+if _is_package_available('vector_quantize_pytorch') and _is_package_available('vocos'):
     from vector_quantize_pytorch import GroupedResidualFSQ
     from vocos import Vocos
     from vocos.pretrained import instantiate_class
 
-    _tts_deps = True
-except:
-    _tts_deps = False
-
-from .processing_minicpm_o_2_6 import NumberToTextConverter, sentence_end, VoiceChecker
+_tts_deps = _is_package_available('vector_quantize_pytorch') and _is_package_available('vocos')
 
 logger = logging.get_logger(__name__)
 
@@ -1952,6 +1954,35 @@ def get_cache_usable_length(past_key_value: Cache, new_seq_length: int, layer_id
     return previous_seq_length
 
 
+def whisper_eager_attention_forward(
+    module: nn.Module,
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    attention_mask: Optional[torch.Tensor],
+    scaling: Optional[float] = None,
+    dropout: float = 0.0,
+    head_mask: Optional[torch.Tensor] = None,
+    **kwargs,
+):
+    if scaling is None:
+        scaling = query.size(-1) ** -0.5
+
+    attn_weights = torch.matmul(query, key.transpose(2, 3)) * scaling
+    if attention_mask is not None and attention_mask.ndim == 4:
+        attn_weights = attn_weights + attention_mask[:, :, :, : key.shape[-2]]
+
+    attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+
+    if head_mask is not None:
+        attn_weights = attn_weights * head_mask.view(1, -1, 1, 1)
+
+    attn_weights = nn.functional.dropout(attn_weights, p=dropout, training=module.training)
+    attn_output = torch.matmul(attn_weights, value)
+    attn_output = attn_output.transpose(1, 2).contiguous()
+
+    return attn_output, attn_weights
+
 # Copied from transformers.models.whisper.modeling_whisper.WhisperAttention and support past_key_value
 class MiniCPMWhisperAttention(WhisperAttention):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
@@ -2015,7 +2046,7 @@ class MiniCPMWhisperAttention(WhisperAttention):
                     key_states, value_states, self.layer_idx, {"cache_position": cache_position}
                 )
 
-        attention_interface: Callable = eager_attention_forward
+        attention_interface: Callable = whisper_eager_attention_forward
         if self.config._attn_implementation != "eager":
             attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
 
@@ -2836,31 +2867,6 @@ class MiniCPMConditionalTTSTextDecoderLayer(LlamaDecoderLayer):
 @auto_docstring
 class MiniCPMConditionalTTSTextPreTrainedModel(LlamaPreTrainedModel):
     config_class = MiniCPMConditionalTTSTextConfig
-    base_model_prefix = "model"
-    supports_gradient_checkpointing = True
-    _no_split_modules = ["MiniCPMConditionalTTSTextDecoderLayer"]
-    _skip_keys_device_placement = ["past_key_values"]
-    _supports_flash_attn_2 = True
-    _supports_sdpa = True
-    _supports_flex_attn = True
-    _supports_cache_class = True
-    _supports_quantized_cache = True
-    _supports_static_cache = True
-    _supports_attention_backend = True
-
-    def _init_weights(self, module):
-        std = self.config.initializer_range
-        if isinstance(module, nn.Linear):
-            module.weight.data.normal_(mean=0.0, std=std)
-            if module.bias is not None:
-                module.bias.data.zero_()
-        elif isinstance(module, nn.Embedding):
-            module.weight.data.normal_(mean=0.0, std=std)
-            if module.padding_idx is not None:
-                module.weight.data[module.padding_idx].zero_()
-        elif isinstance(module, MiniCPMConditionalTTSTextRMSNorm):
-            module.weight.data.fill_(1.0)
-
 
 @auto_docstring
 class MiniCPMConditionalTTSTextModel(LlamaModel):
@@ -3931,13 +3937,6 @@ SIGLIP_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "google/siglip-base-patch16-224",
     # See all SigLIP models at https://huggingface.co/models?filter=siglip
 ]
-
-if is_flash_attn_2_available():
-    from flash_attn import flash_attn_func
-    from flash_attn import flash_attn_varlen_func
-    from flash_attn.bert_padding import index_first_axis  # noqa
-    from flash_attn.bert_padding import pad_input
-    from flash_attn.bert_padding import unpad_input
 
 
 # Copied from transformers.models.llama.modeling_llama._get_unpad_data
