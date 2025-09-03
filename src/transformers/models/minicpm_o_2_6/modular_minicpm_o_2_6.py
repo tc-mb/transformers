@@ -962,7 +962,7 @@ class MiniCPM_o_2_6ForConditionalGeneration(MiniCPM_o_2_6PreTrainedModel, Genera
             spk_embeds = wav_numpy = sr = None
 
             if not batched and use_tts_template and generate_audio:
-                result = processor.decode_text(outputs.sequences, processor.tokenizer)
+                result = processor.decode(outputs.sequences)
                 mel_spec = self._generate_mel_spec(
                     model_inputs,
                     outputs,
@@ -1304,7 +1304,7 @@ class MiniCPM_o_2_6ForConditionalGeneration(MiniCPM_o_2_6PreTrainedModel, Genera
             end = check_uncompleted_token(cur_ids[0])
             left_ids = cur_ids[:, end:]
             cur_ids = cur_ids[:, :end]
-            text = processor.decode_text(cur_ids, tokenizer)[0] if end > 0 else ""
+            text = processor.decode(cur_ids)[0] if end > 0 else ""
 
             self.llm_past_key_values = outputs.past_key_values
             input_ids = outputs.sequences[:, -1:]

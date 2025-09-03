@@ -305,33 +305,23 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
         )
         return inputs
 
-    def decode(self, outputs, batched=False):
-        result = self.decode_text(outputs.sequences, self.tokenizer)
-        if not batched:
-            result = result[0]
-        if isinstance(result, list):
-            result = [i.replace(self.tokenizer.tts_end, "") for i in result]
-        else:
-            result = result.replace(self.tokenizer.tts_end, "")
-        return result
-
-    def decode_text(self, result_ids, tokenizer):
+    def decode(self, result_ids, skeip_special_tokens: bool = False):
         result_text = []
         for result in result_ids:
             result = result[result != 0]
             start, end = 0, len(result)
             for i, tok in enumerate(result):
-                if tok == tokenizer.bos_id:
+                if tok == self.tokenizer.bos_id:
                     start = i + 1
                 else:
                     break
             for i in range(len(result) - 1, -1, -1):
-                if result[i] in tokenizer.terminator_ids:
+                if result[i] in self.tokenizer.terminator_ids:
                     end = i
                 else:
                     break
             result = result[start:end]
-            result_text.append(tokenizer.decode(result))
+            result_text.append(self.tokenizer.decode(result, skip_special_tokens=skeip_special_tokens))
         return result_text
 
     def get_sys_prompt(self, ref_audio=None, mode="default", language="zh"):
