@@ -1338,7 +1338,7 @@ class MiniCPM_o_2_6ForConditionalGeneration(MiniCPM_o_2_6PreTrainedModel, Genera
                 copy_msgs,
                 tokenize=False,
                 add_generation_prompt=False,
-                chat_template=processor.default_tts_chat_template,
+                chat_template=processor.tts_chat_template,
             )
             add_special_tokens = True  # add bos
         else:
