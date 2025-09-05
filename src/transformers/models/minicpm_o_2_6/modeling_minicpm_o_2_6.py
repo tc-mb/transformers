@@ -99,7 +99,7 @@ logger = logging.get_logger(__name__)
 @dataclass
 class OmniOutput(ModelOutput):
     text: Optional[Union[str, list[str], Iterator]] = None
-    outputs: GenerateOutput | torch.LongTensor = None
+    outputs: Optional[Union[GenerateOutput, torch.LongTensor]] = None
     spk_embeds: Optional[torch.FloatTensor] = None
     audio_wav: Optional[np.ndarray] = None
     sampling_rate: Optional[int] = None
