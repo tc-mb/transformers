@@ -22,7 +22,6 @@ import re
 from typing import Any, Dict, Optional, Union
 
 import numpy as np
-import torch
 import json
 from copy import deepcopy
 from functools import lru_cache
@@ -34,7 +33,10 @@ from ...processing_utils import ProcessorMixin, ProcessingKwargs, Unpack, Images
 from ...tokenization_utils_base import PreTokenizedInput, TextInput
 
 from ...feature_extraction_utils import BatchFeature
-from ...utils import is_torch_device, is_torch_dtype, requires_backends, TensorType, logging
+from ...utils import is_torch_device, is_torch_dtype, is_torch_available, requires_backends, TensorType, logging
+
+if is_torch_available():
+    import torch
 
 logger = logging.get_logger(__name__)
 

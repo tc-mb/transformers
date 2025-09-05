@@ -49,7 +49,7 @@ from ...generation.utils import GenerateOutput
 from ...integrations import is_deepspeed_zero3_enabled, use_kernel_forward_from_hub
 from ...masking_utils import create_causal_mask, create_sliding_window_causal_mask
 from ...modeling_attn_mask_utils import AttentionMaskConverter, _prepare_4d_attention_mask
-from ...modeling_flash_attention_utils import FlashAttentionKwargs
+from ...modeling_flash_attention_utils import FlashAttentionKwargs, _get_unpad_data
 from ...modeling_layers import GradientCheckpointingLayer
 from ...modeling_outputs import (
     BaseModelOutput,
@@ -4505,8 +4505,7 @@ class MiniCPMVisionEmbedding(nn.Module):
 class MiniCPMVisionAttention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    # Copied from transformers.models.clip.modeling_clip.CLIPAttention.__init__
-    def __init__(self, config):
+    def __init__(self, config: MiniCPMVisionConfig):
         super().__init__()
         self.config = config
         self.embed_dim = config.hidden_size
@@ -4576,19 +4575,6 @@ class MiniCPMVisionAttention(nn.Module):
         attn_output = self.out_proj(attn_output)
 
         return attn_output, attn_weights
-
-
-# Copied from transformers.models.llama.modeling_llama._get_unpad_data
-def _get_unpad_data(attention_mask):
-    seqlens_in_batch = attention_mask.sum(dim=-1, dtype=torch.int32)
-    indices = torch.nonzero(attention_mask.flatten(), as_tuple=False).flatten()
-    max_seqlen_in_batch = seqlens_in_batch.max().item()
-    cu_seqlens = F.pad(torch.cumsum(seqlens_in_batch, dim=0, dtype=torch.torch.int32), (1, 0))
-    return (
-        indices,
-        cu_seqlens,
-        max_seqlen_in_batch,
-    )
 
 
 class MiniCPMVisionFlashAttention2(MiniCPMVisionAttention):
