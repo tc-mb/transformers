@@ -488,26 +488,10 @@ class MiniCPM_o_2_6ForConditionalGeneration(MiniCPM_o_2_6PreTrainedModel, Genera
         for i in range(B):
             patch_attn_mask[i, 0, : tgt_sizes[i][0] * tgt_sizes[i][1]] = True
 
-        vision_batch_size = self.omni_config.vision_batch_size
         all_pixel_values = all_pixel_values.type(dtype)
-        # edge-side model, senstive to gpu memory size in use
-        # without batching, it will occur cuda oom
-        if B > vision_batch_size:
-            hs = []
-            for i in range(0, B, vision_batch_size):
-                start_idx = i
-                end_idx = i + vision_batch_size
-                tmp_hs = self.vpm(
-                    all_pixel_values[start_idx:end_idx],
-                    patch_attention_mask=patch_attn_mask[start_idx:end_idx],
-                    tgt_sizes=tgt_sizes[start_idx:end_idx],
-                ).last_hidden_state
-                hs.append(tmp_hs)
-            vision_embedding = torch.cat(hs, dim=0)
-        else:
-            vision_embedding = self.vpm(
-                all_pixel_values, patch_attention_mask=patch_attn_mask, tgt_sizes=tgt_sizes
-            ).last_hidden_state
+        vision_embedding = self.vpm(
+            all_pixel_values, patch_attention_mask=patch_attn_mask, tgt_sizes=tgt_sizes
+        ).last_hidden_state
 
         vision_embedding = self.resampler(vision_embedding, tgt_sizes)
 
