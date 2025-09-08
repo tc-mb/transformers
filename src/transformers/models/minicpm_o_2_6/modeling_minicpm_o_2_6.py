@@ -4808,13 +4808,14 @@ class MiniCPMVisionEncoderLayer(GradientCheckpointingLayer):
         super().__init__()
         self.embed_dim = config.hidden_size
         self.layer_norm1 = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
-        self._use_flash_attention_2 = config._attn_implementation == "flash_attention_2"
         self.self_attn = (
-            MiniCPMVisionAttention(config) if not self._use_flash_attention_2 else MiniCPMVisionFlashAttention2(config)
+            MiniCPMVisionAttention(config)
+            if not config._attn_implementation == "flash_attention_2"
+            else MiniCPMVisionFlashAttention2(config)
         )
         self.layer_norm2 = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
         self.mlp = MiniCPMVisionMLP(config)
-
+        self._use_flash_attention_2 = config._attn_implementation == "flash_attention_2"
 
     def forward(
         self,
