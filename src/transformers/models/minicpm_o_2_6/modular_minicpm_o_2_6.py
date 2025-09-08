@@ -66,7 +66,6 @@ from ...integrations import is_deepspeed_zero3_enabled
 from ...modeling_flash_attention_utils import FlashAttentionKwargs, _get_unpad_data
 from ...processing_utils import Unpack
 
-from ..bert.tokenization_bert_fast import BertTokenizerFast
 from ..siglip.configuration_siglip import SiglipVisionConfig
 from ..siglip.modeling_siglip import SiglipEncoderLayer, SiglipEncoder, SiglipMLP, SiglipVisionModelOutput
 from ..whisper.configuration_whisper import WhisperConfig
@@ -168,7 +167,7 @@ class MiniCPMConditionalTTSConfig(PretrainedConfig):
 
 
 class MiniCPM_o_2_6TextConfig(Qwen2Config):
-    model_type = "minicpmo"
+    model_type = "minicpm_o_2_6_text"
 
 class MiniCPMVisionConfig(SiglipVisionConfig):
     pass
@@ -177,6 +176,72 @@ class MiniCPMWhisperConfig(WhisperConfig):
     pass 
 
 class MiniCPM_o_2_6Config(PretrainedConfig):
+    r"""
+    This is the configuration class to store the configuration of a [`MiniCPM_o_2_6Model`]. It is used to instantiate a
+    MiniCPM-o-2.6 model according to the specified arguments, defining the model architecture. Instantiating a configuration
+    with the defaults will yield a similar configuration to that of the MiniCPM-o-2.6 
+    [openbmb/MiniCPM-o-2_6](https://huggingface.co/openbmb/MiniCPM-o-2_6) architecture.
+
+    The MiniCPM-o-2.6 model is a multimodal large language model that supports text, image, and audio inputs. It consists of
+    four main components: a text model for language understanding and generation, a vision model for image processing,
+    an audio model for speech understanding, and a TTS (text-to-speech) model for audio generation.
+
+    Configuration objects inherit from [`PretrainedConfig`] and can be used to control the model outputs. Read the
+    documentation from [`PretrainedConfig`] for more information.
+
+    Args:
+        text_config (`MiniCPM_o_2_6TextConfig` or `dict`, *optional*):
+            Configuration for the text model component. If None, will use default MiniCPM_o_2_6TextConfig.
+        vision_config (`MiniCPMVisionConfig` or `dict`, *optional*):
+            Configuration for the vision model component. If None, will use default configuration with SigLIP-like architecture.
+        audio_config (`MiniCPMWhisperConfig` or `dict`, *optional*):
+            Configuration for the audio model component. If None, will use default MiniCPMWhisperConfig similar to Whisper-medium.
+        tts_config (`MiniCPMConditionalTTSConfig` or `dict`, *optional*):
+            Configuration for the text-to-speech model component. If None, will use default MiniCPMConditionalTTSConfig.
+        use_cache (`bool`, *optional*, defaults to `True`):
+            Whether or not the model should return the last key/values attentions (not used by all models). Only
+            relevant if `config.is_decoder=True`.
+        query_num (`int`, *optional*, defaults to 64):
+            Number of query tokens used in the vision-language cross-attention mechanism.
+        drop_vision_last_layer (`bool`, *optional*, defaults to `True`):
+            Whether to drop the last layer of the vision encoder to reduce computational overhead.
+        vision_batch_size (`int`, *optional*, defaults to 16):
+            Batch size for processing vision inputs, used for memory optimization during image processing.
+        audio_pool_step (`int`, *optional*, defaults to 2):
+            Pooling step size for audio feature extraction, controls the temporal resolution of audio features.
+        audio_chunk_length (`float`, *optional*, defaults to 1.0):
+            Length of audio chunks in seconds for processing long audio sequences.
+
+    Example:
+        ```python
+        >>> from transformers import MiniCPM_o_2_6Config, MiniCPM_o_2_6Model
+
+        >>> # Initializing a MiniCPM-o-2.6 configuration with default settings
+        >>> configuration = MiniCPM_o_2_6Config()
+
+        >>> # Initializing a model from the configuration
+        >>> model = MiniCPM_o_2_6Model(configuration)
+
+        >>> # Accessing the model configuration
+        >>> configuration = model.config
+
+        >>> # Customizing text model configuration
+        >>> text_config = {"hidden_size": 4096, "num_hidden_layers": 32}
+        >>> configuration = MiniCPM_o_2_6Config(text_config=text_config)
+
+        >>> # Customizing vision model configuration
+        >>> vision_config = {"hidden_size": 1152, "image_size": 980, "patch_size": 14}
+        >>> configuration = MiniCPM_o_2_6Config(vision_config=vision_config)
+
+        >>> # Customizing audio processing parameters
+        >>> configuration = MiniCPM_o_2_6Config(
+        ...     audio_chunk_length=2.0,
+        ...     audio_pool_step=4,
+        ...     query_num=128
+        ... )
+        ```
+    """
+    model_type = "minicpm_o_2_6"
 
     default_vision_config = {
         "hidden_size": 1152,
@@ -327,7 +392,8 @@ class MiniCPM_o_2_6ForConditionalGeneration(MiniCPM_o_2_6PreTrainedModel, Genera
         if not os.path.exists(tts_text_tokenizer_path):
             # try from hf model_id
             tts_text_tokenizer_path = "openbmb/chattts_tokenizer"
-
+        
+        from ..bert.tokenization_bert_fast import BertTokenizerFast
         tts_text_tokenizer = BertTokenizerFast.from_pretrained(tts_text_tokenizer_path)
         self.tts_processor = ChatTTSProcessor(text_tokenizer=tts_text_tokenizer)
 
@@ -1976,7 +2042,7 @@ def whisper_eager_attention_forward(
 
     return attn_output, attn_weights
 
-# Copied from transformers.models.whisper.modeling_whisper.WhisperAttention and support past_key_value
+# Borrowed from transformers.models.whisper.modeling_whisper.WhisperAttention and support past_key_value
 class MiniCPMWhisperAttention(WhisperAttention):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
@@ -2062,7 +2128,7 @@ class MiniCPMWhisperAttention(WhisperAttention):
         return attn_output, attn_weights, past_key_values
 
 
-# Copied from transformers.models.whisper.modeling_whisper.WhisperEncoderLayer and add use_cache for streaming inference
+# Borrowed from transformers.models.whisper.modeling_whisper.WhisperEncoderLayer and add use_cache for streaming inference
 class MiniCPMWhisperEncoderLayer(WhisperEncoderLayer):
     def __init__(self, config: MiniCPMWhisperConfig, layer_idx: int = None):
         super().__init__()
@@ -2146,7 +2212,7 @@ class MiniCPMWhisperEncoderLayer(WhisperEncoderLayer):
         return outputs
 
 
-# Copied from from transformers.models.whisper.modeling_whisper.WhisperEncoder and add use_cache for streaming inference
+# Borrowed from from transformers.models.whisper.modeling_whisper.WhisperEncoder and add use_cache for streaming inference
 class MiniCPMWhisperEncoder(WhisperEncoder):
     def __init__(self, config: MiniCPMWhisperConfig):
         super().__init__(config)
@@ -4673,4 +4739,4 @@ class MiniCPMVisionTransformer(MiniCPMVisionPreTrainedModel):
         )
 
 
-__all__ = ["MiniCPM_o_2_6ForConditionalGeneration", "MiniCPM_o_2_6TextModel", "MiniCPM_o_2_6PreTrainedModel", "MiniCPM_o_2_6Config"]
+__all__ = ["MiniCPM_o_2_6ForConditionalGeneration", "MiniCPM_o_2_6PreTrainedModel", "MiniCPM_o_2_6Config"]

@@ -153,16 +153,45 @@ class MiniCPM_o_2_6ProcessorKwargs(ProcessingKwargs, total=False):
 
 class MiniCPM_o_2_6Processor(ProcessorMixin):
     r"""
-    Constructs a MiniCPMV processor which wraps a MiniCPMV image processor and a MiniCPMV tokenizer into a single processor.
+    Constructs a MiniCPM-o-2.6 processor which wraps a MiniCPMV image processor, feature extractor, and tokenizer into a single processor.
 
-    [`MiniCPMVProcessor`] offers all the functionalities of [`MiniCPMVImageProcessor`] and [`LlamaTokenizerWrapper`]. See the
-    [`~MiniCPMVProcessor.__call__`] and [`~MiniCPMVProcessor.decode`] for more information.
+    [`MiniCPM_o_2_6Processor`] offers all the functionalities of [`MiniCPMVImageProcessor`], [`MiniCPM_o_2_6FeatureExtractor`] and tokenizer. 
+    See the [`~MiniCPM_o_2_6Processor.__call__`] and [`~MiniCPM_o_2_6Processor.decode`] for more information.
+
+    This processor supports multimodal inputs including text, images, and audio. It can handle various tasks such as:
+    - Visual question answering with images
+    - Audio understanding and generation
+    - Omni-modal processing (simultaneous video, audio, and text)
+    - Voice cloning and text-to-speech generation
 
     Args:
-        image_processor ([`MiniCPMVImageProcessor`], *optional*):
-            The image processor is a required input.
         tokenizer ([`LlamaTokenizerWrapper`], *optional*):
-            The tokenizer is a required input.
+            The tokenizer is a required input. Used for encoding text inputs and decoding model outputs.
+        image_processor ([`MiniCPMVImageProcessor`], *optional*):
+            The image processor is a required input. Handles image preprocessing including resizing, slicing, and normalization.
+        feature_extractor ([`MiniCPM_o_2_6FeatureExtractor`], *optional*):
+            The feature extractor for processing audio inputs. Converts audio waveforms to features compatible with the model.
+        chat_template (`str`, *optional*):
+            The Jinja template string used for formatting chat conversations. If not provided, uses the tokenizer's default template.
+        tts_chat_template (`str`, *optional*):
+            Special chat template for text-to-speech scenarios when audio generation is required.
+        parse_template (`str`, *optional*):
+            Jinja template for parsing multimodal messages containing text, images, and audio components.
+
+    Examples:
+        ```python
+        >>> from transformers import AutoProcessor
+        >>> from PIL import Image
+
+        >>> processor = AutoProcessor.from_pretrained('openbmb/MiniCPM-o-2_6')
+
+        >>> # Apply chat template for conversation
+        >>> image = Image.open("path/to/image.jpg")
+        >>> messages = [
+        ...     {"role": "user", "content": ["What's in this image?", image]}
+        ... ]
+        >>> inputs = processor.apply_chat_template(messages)
+        ```
     """
 
     attributes = ["tokenizer", "image_processor", "feature_extractor"]

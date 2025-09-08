@@ -71,7 +71,6 @@ from ...utils import (
     replace_return_docstrings,
 )
 from ...utils.deprecation import deprecate_kwarg
-from ..bert.tokenization_bert_fast import BertTokenizerFast
 from ...utils.generic import check_model_inputs
 from ...utils.import_utils import _is_package_available, is_flash_attn_2_available
 from .configuration_minicpm_o_2_6 import (
@@ -400,6 +399,7 @@ class MiniCPM_o_2_6TextModel(MiniCPM_o_2_6PreTrainedModel):
         self.post_init()
 
     @check_model_inputs
+    @auto_docstring
     def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
@@ -613,6 +613,8 @@ class MiniCPM_o_2_6ForConditionalGeneration(MiniCPM_o_2_6PreTrainedModel, Genera
         if not os.path.exists(tts_text_tokenizer_path):
             # try from hf model_id
             tts_text_tokenizer_path = "openbmb/chattts_tokenizer"
+
+        from ..bert.tokenization_bert_fast import BertTokenizerFast
 
         tts_text_tokenizer = BertTokenizerFast.from_pretrained(tts_text_tokenizer_path)
         self.tts_processor = ChatTTSProcessor(text_tokenizer=tts_text_tokenizer)
@@ -5212,4 +5214,4 @@ class MiniCPMVisionTransformer(MiniCPMVisionPreTrainedModel):
         )
 
 
-__all__ = ["MiniCPM_o_2_6ForConditionalGeneration", "MiniCPM_o_2_6TextModel", "MiniCPM_o_2_6PreTrainedModel"]
+__all__ = ["MiniCPM_o_2_6ForConditionalGeneration", "MiniCPM_o_2_6PreTrainedModel"]
