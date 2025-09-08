@@ -19,11 +19,17 @@ from typing import Literal
 
 import librosa
 import numpy as np
-import torch
-import torchaudio
+
+from ...utils.import_utils import is_torch_available, is_torchaudio_available
 
 
 from ...utils import logging
+
+if is_torch_available():
+    import torch
+
+if is_torchaudio_available():
+    import torchaudio
 
 logger = logging.get_logger(__name__)
 

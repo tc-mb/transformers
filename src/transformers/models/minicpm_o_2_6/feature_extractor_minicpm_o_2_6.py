@@ -17,10 +17,12 @@ import math
 from typing import Optional, Union
 
 import numpy as np
-import torch
 
+from ...utils.import_utils import is_torch_available
 from ..whisper.feature_extraction_whisper import WhisperFeatureExtractor
 
+if is_torch_available():
+    import torch
 
 class MiniCPM_o_2_6FeatureExtractor(WhisperFeatureExtractor):
     def __init__(self, *args, **kwargs):
