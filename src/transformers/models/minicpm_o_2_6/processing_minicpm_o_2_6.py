@@ -151,27 +151,6 @@ class MiniCPM_o_2_6ProcessorKwargs(ProcessingKwargs, total=False):
     }
 
 
-PARSE_TEMPLATE = "{%- for i, msg in enumerate(msgs) -%}{%- set role = msg[\"role\"] -%}{%- set content = msg[\"content\"] -%}{%- if role not in [\"system\", \"user\", \"assistant\"] -%}{{ raise_error(\"Invalid role: \" + role) }}{%- endif -%}{%- if i == 0 and role not in [\"user\", \"system\"] -%}{{ raise_error(\"The role of first msg should be user or system\") }}{%- endif -%}{%- if content is string -%}{%- set content = [content] -%}{%- endif -%}{%- set cur_msgs = [] -%}{%- for c in content -%}{%- if isinstance(c, Image.Image) -%}{{ collect_image(c, cur_msgs) }}{%- elif c.__class__.__name__ == \"ndarray\" -%}{{ collect_audio(c, i, cur_msgs) }}{%- elif c is string -%}{{ collect_text(c, cur_msgs) }}{%- endif -%}{%- endfor -%}{%- set _ = msg.update({\"content\": join_content(cur_msgs, omni_input)}) -%}{%- endfor -%}"
-
-
-@lru_cache(maxsize=1)
-def get_precompiled_template():
-    env = Environment(
-        cache_size=100,
-        auto_reload=False,
-        optimized=True
-    )
-
-    env.globals.update({
-        'enumerate': enumerate,
-        'isinstance': isinstance,
-        'Image': Image,
-        'np': np
-    })
-
-    return env.from_string(PARSE_TEMPLATE)
-
-
 class MiniCPM_o_2_6Processor(ProcessorMixin):
     r"""
     Constructs a MiniCPMV processor which wraps a MiniCPMV image processor and a MiniCPMV tokenizer into a single processor.
@@ -191,10 +170,11 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
     image_processor_class = "MiniCPMVImageProcessorFast"
     feature_extractor_class = "MiniCPM_o_2_6FeatureExtractor"
 
-    def __init__(self, tokenizer=None, image_processor=None, feature_extractor=None, chat_template=None, tts_chat_template=None):
+    def __init__(self, tokenizer=None, image_processor=None, feature_extractor=None, chat_template=None, tts_chat_template=None, parse_template=None):
         super().__init__(tokenizer, image_processor, feature_extractor, chat_template=chat_template)
 
         self.tts_chat_template = tts_chat_template
+        self.parse_template = parse_template
 
         self.image_tag = getattr(tokenizer, 'image_tag', "(<image>./</image>)")
         self.image_pattern = getattr(tokenizer, 'image_pattern', "\(<image>./</image>\)")
@@ -204,7 +184,6 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
 
         self.terminators = [tokenizer.eos_token, tokenizer.pad_token, tokenizer.tts_end]
         self.terminator_ids = [tokenizer.convert_tokens_to_ids(t) for t in self.terminators]
-        
 
     def __call__(
         self,
@@ -288,7 +267,7 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
         }
 
         # 获取预编译的模板
-        template = get_precompiled_template()
+        template = self.get_precompiled_template(self.parse_template)
 
         # 添加自定义函数
         def collect_image(img, msg_list):
@@ -334,6 +313,23 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
             results['audio_parts'],
             results['use_tts_template']
         )
+
+    @lru_cache(maxsize=1)
+    def get_precompiled_template(self, template):
+        env = Environment(
+            cache_size=100,
+            auto_reload=False,
+            optimized=True
+        )
+
+        env.globals.update({
+            'enumerate': enumerate,
+            'isinstance': isinstance,
+            'Image': Image,
+            'np': np
+        })
+
+        return env.from_string(template)
 
     def apply_chat_template(
         self,
