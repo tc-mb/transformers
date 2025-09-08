@@ -234,9 +234,11 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
         for i, msg in enumerate(msgs):
             role = msg["role"]
             content = msg["content"]
-            assert role in ["system", "user", "assistant"]
+            if role not in ["system", "user", "assistant"]:
+                raise ValueError(f"Role must be one of ['system', 'user', 'assistant'], got {role}")
             if i == 0:
-                assert role in ["user", "system"], "The role of first msg should be user"
+                if role not in ["user", "system"]:
+                    raise ValueError("The role of first msg should be user or system")
             if isinstance(content, str):
                 content = [content]
             cur_msgs = []
@@ -293,7 +295,7 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
                 return "\n".join(msg_list)
 
         def raise_error(msg):
-            raise AssertionError(msg)
+            raise ValueError(msg)
 
         # 渲染模板
         template.render(
@@ -367,7 +369,8 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
         for msgs in msgs_list:
             if isinstance(msgs, str):
                 msgs = json.loads(msgs)
-            assert len(msgs) > 0, "msgs is empty"
+            if len(msgs) == 0:
+                raise ValueError("input messagees is empty")
 
             parsed_msgs, images, audios, audio_parts, use_tts_template = self.parse_msgs_jinja(deepcopy(msgs), omni_input, use_tts_template)
             prompts = self.tokenizer.apply_chat_template(
@@ -432,7 +435,8 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
 
         """
         if ref_audio is not None:
-            assert isinstance(ref_audio, np.ndarray), "ref_audio error"
+            if not isinstance(ref_audio, np.ndarray):
+                raise TypeError("ref_audio error, should be np.ndarray, but got {}".format(type(ref_audio)))
         if mode == "omni":
             if language == "zh":
                 sys_prompt = "你是一个AI助手。你能接受视频，音频和文本输入并输出语音和文本。"
@@ -527,12 +531,14 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
         # audio bound
         audio_start_idx = torch.where(input_ids == self.tokenizer.audio_start_id)[0]
         audio_end_idx = torch.where(input_ids == self.tokenizer.audio_end_id)[0]
-        assert len(audio_start_idx) == len(audio_end_idx)
+        if len(audio_start_idx) != len(audio_end_idx):
+            raise ValueError(f"Mismatched audio start and end tokens: {len(audio_start_idx)} start tokens vs {len(audio_end_idx)} end tokens")
         audio_bounds = torch.hstack([(audio_start_idx + 1).unsqueeze(-1), audio_end_idx.unsqueeze(-1)])
 
         spk_start_idx = torch.where(input_ids == self.tokenizer.spk_start_id)[0]
         spk_end_idx = torch.where(input_ids == self.tokenizer.spk_end_id)[0]
-        assert len(spk_start_idx) == len(spk_end_idx)
+        if len(spk_start_idx) != len(spk_end_idx):
+            raise ValueError(f"Mismatched speaker start and end tokens: {len(spk_start_idx)} start tokens vs {len(spk_end_idx)} end tokens")
         spk_bounds = torch.hstack([(spk_start_idx + 1).unsqueeze(-1), spk_end_idx.unsqueeze(-1)])
 
         return input_ids, image_bounds, audio_bounds, spk_bounds
@@ -577,11 +583,15 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
             audio_tags = re.findall(self.audio_pattern, text)
 
             if image_tags:
-                assert images is not None
-                assert len(image_tags) == len(image_sizes[index])
+                if images is None:
+                    raise ValueError("Found image tags but no images provided")
+                if len(image_tags) != len(image_sizes[index]):
+                    raise ValueError(f"Number of image tags ({len(image_tags)}) doesn't match number of image sizes ({len(image_sizes[index])})")
             if audio_tags:
-                assert audio_phs is not None
-                assert len(audio_tags) == len(audio_phs[index])
+                if audio_phs is None:
+                    raise ValueError("Found audio tags but no audio placeholders provided")
+                if len(audio_tags) != len(audio_phs[index]):
+                    raise ValueError(f"Number of audio tags ({len(audio_tags)}) doesn't match number of audio placeholders ({len(audio_phs[index])})")
 
             image_id = 0
             audio_id = 0
@@ -640,7 +650,8 @@ class MiniCPM_o_2_6Processor(ProcessorMixin):
 
     def get_slice_image_placeholder(self, image_size, image_idx=0, max_slice_nums=None, use_image_id=None):
         max_slice_nums = self.image_processor.max_slice_nums if max_slice_nums is None else int(max_slice_nums)
-        assert max_slice_nums > 0
+        if max_slice_nums <= 0:
+            raise ValueError(f"max_slice_nums must be greater than 0, got {max_slice_nums}")
         grid = self.image_processor.get_sliced_grid(image_size=image_size, max_slice_nums=max_slice_nums)
 
         image_placeholder = (
